@@ -227,7 +227,7 @@ export async function clearSearchHistory(token: string): Promise<void> {
 }
 
 // Favorites API
-export async function addFavoriteConnection(connectionId: string, token: string): Promise<any> {
+export async function addFavoriteConnection(connectionId: string, token: string): Promise<{ message: string }> {
     const response = await fetch(`${API_BASE_URL}/api/v1/favorites`, {
         method: 'POST',
         headers: {

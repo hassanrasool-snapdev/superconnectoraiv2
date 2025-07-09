@@ -30,8 +30,8 @@ export default function DataManagementPage() {
     try {
       const result = await uploadConnectionsCSV(file, token);
       setMessage(result.message);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setLoading(false);
     }
@@ -45,8 +45,8 @@ export default function DataManagementPage() {
     try {
       await deleteConnections(token);
       setMessage('Successfully deleted all connections.');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Delete failed');
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../../src/context/AuthContext';
 import { FavoriteConnection } from '../../../src/lib/types';
 import { getFavoriteConnections, removeFavoriteConnection } from '../../../src/lib/api';
@@ -16,13 +16,7 @@ export default function FavoritesPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    if (token) {
-      loadFavorites();
-    }
-  }, [token]);
-
-  const loadFavorites = async () => {
+  const loadFavorites = useCallback(async () => {
     try {
       const favoritesData = await getFavoriteConnections(token!);
       setFavorites(favoritesData);
@@ -31,7 +25,13 @@ export default function FavoritesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      loadFavorites();
+    }
+  }, [token, loadFavorites]);
 
   const handleRemoveFavorite = async (connectionId: string) => {
     if (!confirm('Are you sure you want to remove this connection from favorites?')) return;

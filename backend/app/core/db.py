@@ -14,7 +14,11 @@ db = Database()
 async def connect_to_mongo():
     logger.info("Connecting to MongoDB...")
     try:
-        db.client = AsyncIOMotorClient(settings.DATABASE_URL)
+        db.client = AsyncIOMotorClient(
+            settings.DATABASE_URL,
+            tls=True,
+            tlsAllowInvalidCertificates=True
+        )
         # The ismaster command is cheap and does not require auth.
         await db.client.admin.command('ismaster')
         logger.info("Successfully connected to MongoDB.")
