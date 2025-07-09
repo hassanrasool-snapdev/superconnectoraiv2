@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from pydantic import BaseModel
 from app.services.embeddings_service import embeddings_service
 from app.services.auth_service import get_current_user
@@ -19,7 +19,7 @@ class ProcessProfilesRequest(BaseModel):
     chunk_size: Optional[int] = 100
 
 class EmbeddingResponse(BaseModel):
-    embedding: list[float]
+    embedding: List[float]
     canonical_text: str
 
 class ProcessingResponse(BaseModel):
