@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../../src/context/AuthContext';
 import { SavedSearch, SearchFilters } from '../../../src/lib/types';
-import { getSavedSearches, deleteSavedSearch, searchConnections } from '../../../src/lib/api';
+import { getSavedSearches, deleteSavedSearch } from '../../../src/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,13 +16,7 @@ export default function SavedSearchesPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    if (token) {
-      loadSavedSearches();
-    }
-  }, [token]);
-
-  const loadSavedSearches = async () => {
+  const loadSavedSearches = useCallback(async () => {
     try {
       const searches = await getSavedSearches(token!);
       setSavedSearches(searches);
@@ -31,7 +25,13 @@ export default function SavedSearchesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      loadSavedSearches();
+    }
+  }, [token, loadSavedSearches]);
 
   const handleDeleteSearch = async (searchId: string) => {
     if (!confirm('Are you sure you want to delete this saved search?')) return;
@@ -142,7 +142,7 @@ export default function SavedSearchesPage() {
                     <div className="flex-1">
                       <CardTitle className="text-lg">{savedSearch.name}</CardTitle>
                       <CardDescription className="mt-1">
-                        Query: "{savedSearch.query}"
+                        Query: &quot;{savedSearch.query}&quot;
                       </CardDescription>
                     </div>
                     <div className="flex items-center space-x-2 ml-4">

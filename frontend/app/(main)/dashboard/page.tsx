@@ -7,7 +7,7 @@ import { SearchResult } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '../../../src/components/ui/badge';
-import { Search, User, Linkedin, Loader2 } from 'lucide-react';
+import { User, Linkedin, Loader2 } from 'lucide-react';
 
 export default function DashboardPage() {
   const { token } = useAuth();
@@ -99,7 +99,7 @@ export default function DashboardPage() {
                 <p className="text-gray-400 mt-2">Try adjusting your search terms or uploading more connection data.</p>
               </div>
             ) : (
-              results.map((result, index) => (
+              results.map((result) => (
                 <div key={result.connection.id} className="bg-white rounded-lg shadow-sm border p-6">
                   {/* Header with avatar, name, and score */}
                   <div className="flex items-start justify-between mb-4">
@@ -212,10 +212,10 @@ export default function DashboardPage() {
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h3 className="text-lg font-semibold mb-3">Getting Started</h3>
             <div className="space-y-2 text-sm text-gray-600">
-              <p>• Use natural language to describe who you're looking for</p>
-              <p>• Try queries like "VCs who invest in seed stage consumer startups"</p>
+              <p>• Use natural language to describe who you&apos;re looking for</p>
+              <p>• Try queries like &quot;VCs who invest in seed stage consumer startups&quot;</p>
               <p>• The AI will analyze your connections and provide detailed match analysis</p>
-              <p>• Connections with scores 9-10 are marked as "Top Matches"</p>
+              <p>• Connections with scores 9-10 are marked as &quot;Top Matches&quot;</p>
             </div>
           </div>
         )}
