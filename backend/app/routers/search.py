@@ -1,13 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.responses import StreamingResponse
+from typing import List, Optional, AsyncGenerator
 from pydantic import BaseModel
 from uuid import UUID
-import anthropic
+import json
+import asyncio
 from datetime import datetime
 
 from app.services.auth_service import get_current_user
 from app.services import connections_service, search_history_service
 from app.services.ai_service import search_connections
+from app.services.retrieval_service import retrieval_service
 from app.models.search_history import SearchHistoryCreate
 from app.core.db import get_database
 
@@ -36,11 +39,13 @@ class SearchResult(BaseModel):
 @router.post("/search", response_model=List[SearchResult])
 async def ai_search_connections(
     search_request: SearchRequest,
+    page: int = Query(1, ge=1, description="Page number for pagination"),
+    page_size: int = Query(20, ge=1, le=100, description="Number of results per page"),
     current_user: dict = Depends(get_current_user),
     db = Depends(get_database)
 ):
     """
-    Perform AI-powered search on user's connections
+    Perform AI-powered search on user's connections using the new retrieval service
     """
     if not search_request.query.strip():
         raise HTTPException(
@@ -49,19 +54,36 @@ async def ai_search_connections(
         )
     
     try:
-        # Get user's connections (limit to reasonable number for AI analysis)
         user_id = current_user["id"]
-        connections = await connections_service.get_user_connections(db, user_id, page=1, limit=200)
         
-        if not connections:
-            return []
-        
-        # Apply filters if provided
+        # Convert filters to the format expected by the retrieval service
+        filter_dict = None
         if search_request.filters:
-            connections = apply_search_filters(connections, search_request.filters)
+            filter_dict = convert_search_filters_to_pinecone_filter(search_request.filters)
         
-        # Use AI to search and rank connections
-        search_results = await search_connections(search_request.query, connections)
+        # Use the new retrieval service for search and re-ranking
+        reranked_results = await retrieval_service.retrieve_and_rerank(
+            user_query=search_request.query,
+            user_id=user_id,
+            enable_query_rewrite=True,
+            filter_dict=filter_dict
+        )
+        
+        # Apply pagination
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        paginated_results = reranked_results[start_idx:end_idx]
+        
+        # Convert to the expected SearchResult format
+        search_results = []
+        for result in paginated_results:
+            search_results.append(SearchResult(
+                connection=result["profile"],
+                score=result["score"],
+                summary=result["pro"],  # Use pro as summary
+                pros=[result["pro"]],
+                cons=[result["con"]]
+            ))
         
         # Save search to history
         try:
@@ -83,6 +105,129 @@ async def ai_search_connections(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Search failed: {str(e)}"
         )
+
+@router.post("/search/stream")
+async def ai_search_connections_stream(
+    search_request: SearchRequest,
+    page: int = Query(1, ge=1, description="Page number for pagination"),
+    page_size: int = Query(20, ge=1, le=100, description="Number of results per page"),
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    """
+    Perform AI-powered search with streaming results using Server-Sent Events
+    """
+    if not search_request.query.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Search query cannot be empty"
+        )
+    
+    async def generate_search_stream() -> AsyncGenerator[str, None]:
+        try:
+            user_id = current_user["id"]
+            
+            # Send initial status
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Starting search...'})}\n\n"
+            
+            # Convert filters to the format expected by the retrieval service
+            filter_dict = None
+            if search_request.filters:
+                filter_dict = convert_search_filters_to_pinecone_filter(search_request.filters)
+            
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Generating query embedding...'})}\n\n"
+            
+            # Use the new retrieval service for search and re-ranking
+            reranked_results = await retrieval_service.retrieve_and_rerank(
+                user_query=search_request.query,
+                user_id=user_id,
+                enable_query_rewrite=True,
+                filter_dict=filter_dict
+            )
+            
+            yield f"data: {json.dumps({'type': 'status', 'message': f'Found {len(reranked_results)} results, applying pagination...'})}\n\n"
+            
+            # Apply pagination
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            paginated_results = reranked_results[start_idx:end_idx]
+            
+            # Stream results in chunks
+            chunk_size = 5  # Send 5 results at a time
+            for i in range(0, len(paginated_results), chunk_size):
+                chunk = paginated_results[i:i + chunk_size]
+                
+                # Convert to the expected SearchResult format
+                search_results = []
+                for result in chunk:
+                    search_results.append({
+                        "connection": result["profile"],
+                        "score": result["score"],
+                        "summary": result["pro"],
+                        "pros": [result["pro"]],
+                        "cons": [result["con"]]
+                    })
+                
+                # Send chunk of results
+                yield f"data: {json.dumps({'type': 'results', 'data': search_results, 'chunk': i//chunk_size + 1})}\n\n"
+                
+                # Small delay to simulate streaming
+                await asyncio.sleep(0.1)
+            
+            # Save search to history
+            try:
+                history_entry = SearchHistoryCreate(
+                    query=search_request.query,
+                    filters=search_request.filters.model_dump() if search_request.filters else None,
+                    results_count=len(paginated_results)
+                )
+                await search_history_service.create_search_history_entry(db, UUID(user_id), history_entry)
+            except Exception as history_error:
+                print(f"Failed to save search history: {history_error}")
+            
+            # Send completion message
+            yield f"data: {json.dumps({'type': 'complete', 'total_results': len(paginated_results)})}\n\n"
+            
+        except Exception as e:
+            print(f"Streaming search error: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': f'Search failed: {str(e)}'})}\n\n"
+    
+    return StreamingResponse(
+        generate_search_stream(),
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Content-Type": "text/event-stream"
+        }
+    )
+
+def convert_search_filters_to_pinecone_filter(filters: SearchFilters) -> dict:
+    """Convert SearchFilters to Pinecone metadata filter format"""
+    filter_dict = {}
+    
+    if filters.industries:
+        filter_dict["company_industry"] = {"$in": filters.industries}
+    
+    if filters.company_sizes:
+        filter_dict["company_size"] = {"$in": filters.company_sizes}
+    
+    if filters.locations:
+        # For locations, we might need to check city, state, or country
+        location_conditions = []
+        for location in filters.locations:
+            location_conditions.extend([
+                {"city": {"$eq": location}},
+                {"state": {"$eq": location}},
+                {"country": {"$eq": location}}
+            ])
+        if location_conditions:
+            filter_dict["$or"] = location_conditions
+    
+    # Note: Date range and follower filters would need to be handled differently
+    # in Pinecone as they require numeric comparisons
+    
+    return filter_dict if filter_dict else None
 
 def apply_search_filters(connections: List[dict], filters: SearchFilters) -> List[dict]:
     """Apply advanced filters to connection list"""

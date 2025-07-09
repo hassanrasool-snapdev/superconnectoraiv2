@@ -19,7 +19,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const userProfile = await getUserProfile(storedToken);
           setUser(userProfile);
           setToken(storedToken);
-        } catch (error) {
+        } catch {
           localStorage.removeItem('authToken');
         }
       }

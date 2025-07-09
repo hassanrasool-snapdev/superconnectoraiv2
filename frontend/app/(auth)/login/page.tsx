@@ -25,8 +25,8 @@ export default function LoginPage() {
       const userProfile = await getUserProfile(access_token);
       login(access_token, userProfile);
       // Redirect is now handled by the PublicRoute wrapper
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
     } finally {
       setIsSubmitting(false);
     }

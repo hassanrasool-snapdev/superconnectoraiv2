@@ -23,8 +23,8 @@ export default function RegisterPage() {
     try {
       await registerUser(email, password);
       router.push('/login'); // Redirect to login page after successful registration
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
     } finally {
       setLoading(false);
     }

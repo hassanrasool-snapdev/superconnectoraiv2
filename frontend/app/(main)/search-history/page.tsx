@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../../src/context/AuthContext';
 import { SearchHistory, SearchFilters } from '../../../src/lib/types';
 import { getSearchHistory, deleteSearchHistoryEntry, clearSearchHistory } from '../../../src/lib/api';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '../../../src/components/ui/badge';
-import { Search, Trash2, Play, Calendar, Filter, RotateCcw } from 'lucide-react';
+import { Search, Trash2, Calendar, Filter, RotateCcw } from 'lucide-react';
 
 export default function SearchHistoryPage() {
   const { token } = useAuth();
@@ -16,13 +16,7 @@ export default function SearchHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    if (token) {
-      loadSearchHistory();
-    }
-  }, [token]);
-
-  const loadSearchHistory = async () => {
+  const loadSearchHistory = useCallback(async () => {
     try {
       const history = await getSearchHistory(token!, 50);
       setSearchHistory(history);
@@ -31,7 +25,13 @@ export default function SearchHistoryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      loadSearchHistory();
+    }
+  }, [token, loadSearchHistory]);
 
   const handleDeleteEntry = async (searchId: string) => {
     if (!confirm('Are you sure you want to delete this search history entry?')) return;
@@ -160,7 +160,7 @@ export default function SearchHistoryPage() {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="text-lg">"{entry.query}"</CardTitle>
+                      <CardTitle className="text-lg">&quot;{entry.query}&quot;</CardTitle>
                       <CardDescription className="mt-1">
                         {entry.results_count} result{entry.results_count !== 1 ? 's' : ''} found
                       </CardDescription>
