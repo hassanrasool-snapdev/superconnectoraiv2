@@ -121,7 +121,7 @@ export async function searchConnections(searchRequest: SearchRequest, token: str
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Search failed');
     }
-    return response.json();
+    return response.json() as Promise<SearchResult[]>;
 }
 
 // Saved Searches API

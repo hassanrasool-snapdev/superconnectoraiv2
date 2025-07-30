@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '../../../src/components/ui/badge';
 import { User, Linkedin, Loader2 } from 'lucide-react';
+import Image from 'next/image';
 
 export default function DashboardPage() {
   const { token } = useAuth();
@@ -32,7 +33,6 @@ export default function DashboardPage() {
       const searchResults = await searchConnections({ query: query.trim() }, token);
       console.log('Raw search results from API:', JSON.stringify(searchResults, null, 2));
       
-      // @ts-ignore
       setResults(searchResults);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
@@ -113,10 +113,12 @@ export default function DashboardPage() {
                       {/* Avatar */}
                       <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
                         {result.connection.profile_picture ? (
-                          <img
+                          <Image
                             src={result.connection.profile_picture}
                             alt={`${result.connection.first_name} ${result.connection.last_name}`}
                             className="w-full h-full object-cover"
+                            width={64}
+                            height={64}
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
                               target.onerror = null;
@@ -258,10 +260,10 @@ export default function DashboardPage() {
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h3 className="text-lg font-semibold mb-3">Getting Started</h3>
             <div className="space-y-2 text-sm text-gray-600">
-              <p>• Use natural language to describe who you're looking for</p>
-              <p>• Try queries like "VCs who invest in seed stage consumer startups"</p>
+              <p>• Use natural language to describe who you&amp;apos;re looking for</p>
+              <p>• Try queries like &amp;quot;VCs who invest in seed stage consumer startups&amp;quot;</p>
               <p>• The AI will analyze your connections and provide detailed match analysis</p>
-              <p>• Connections with scores 9-10 are marked as "Top Matches"</p>
+              <p>• Connections with scores 9-10 are marked as &amp;quot;Top Matches&amp;quot;</p>
             </div>
           </div>
         )}
