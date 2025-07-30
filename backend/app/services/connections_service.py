@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status, UploadFile
 from app.models.connection import ConnectionInDB
 
-async def process_csv_upload(db, file: UploadFile, user_id: UUID):
+async def process_and_store_connections(db, file: UploadFile, user_id: UUID):
     # First, delete all existing connections for this user
     await db.connections.delete_many({"user_id": str(user_id)})
 
@@ -13,12 +13,12 @@ async def process_csv_upload(db, file: UploadFile, user_id: UUID):
     stream = io.StringIO(content.decode("utf-8"))
     reader = csv.DictReader(stream)
 
-    connections_to_insert = []
+    records_to_insert = []
     for row in reader:
         # Map CSV columns to your Connection model fields
         # This assumes CSV headers match your model field names (e.g., "first_name", "last_name")
         # You might need to adjust this mapping based on the actual CSV format.
-        connection_data = {
+        record = {
             # Personal Information
             "first_name": row.get("First Name", ""),
             "last_name": row.get("Last Name", ""),
@@ -52,22 +52,21 @@ async def process_csv_upload(db, file: UploadFile, user_id: UUID):
             "company_revenue": row.get("CompanyRevenue") or None,
             "company_latest_funding": row.get("CompanyLatestFunding/0") or None,
             "company_linkedin": row.get("CompanyLinkedIn") or None,
-            
-            "user_id": user_id,
         }
+        record['user_id'] = user_id
         
         # Create a ConnectionInDB instance to get default values and validate
-        new_connection = ConnectionInDB(**connection_data)
+        new_connection = ConnectionInDB(**record)
         # Convert UUIDs to strings for MongoDB storage
         connection_dict = new_connection.model_dump(by_alias=True)
         connection_dict["id"] = str(connection_dict["id"])
         connection_dict["user_id"] = str(connection_dict["user_id"])
-        connections_to_insert.append(connection_dict)
+        records_to_insert.append(connection_dict)
 
-    if connections_to_insert:
-        await db.connections.insert_many(connections_to_insert)
+    if records_to_insert:
+        await db.connections.insert_many(records_to_insert)
     
-    return len(connections_to_insert)
+    return len(records_to_insert)
 
 async def get_user_connections(db, user_id: UUID, page: int = 1, limit: int = 100):
     skip = (page - 1) * limit

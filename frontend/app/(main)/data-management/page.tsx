@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '../../../src/context/AuthContext';
-import { uploadConnectionsCSV, deleteConnections } from '../../../src/lib/api';
+import { uploadConnectionsCSV, deleteConnections, clearPineconeData } from '../../../src/lib/api';
 import { Button } from "../../../src/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "../../../src/components/ui/card";
 import { Input } from "../../../src/components/ui/input";
@@ -14,6 +14,7 @@ export default function DataManagementPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   const { token } = useAuth();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,6 +53,21 @@ export default function DataManagementPage() {
     }
   };
 
+  const handleClearAndResync = async () => {
+    if (!token) return;
+    setIsClearing(true);
+    setMessage('');
+    setError('');
+    try {
+      const result = await clearPineconeData(token);
+      setMessage(result.message + ' You can now upload your new file.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Clearing failed');
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Data Management</h1>
@@ -70,6 +86,9 @@ export default function DataManagementPage() {
           <CardFooter>
             <Button onClick={handleUpload} disabled={!file || loading}>
               {loading ? 'Uploading...' : 'Upload and Replace'}
+            </Button>
+            <Button onClick={handleClearAndResync} disabled={isClearing || loading} variant="destructive" className="ml-4">
+              {isClearing ? 'Clearing...' : 'Clear and Re-sync'}
             </Button>
           </CardFooter>
         </Card>

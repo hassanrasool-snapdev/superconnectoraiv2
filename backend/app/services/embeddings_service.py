@@ -53,22 +53,37 @@ class EmbeddingsService:
         self.embedding_model = "text-embedding-3-small"
         self.batch_size = 500
         
-    def canonicalize_profile_text(self, name: str, headline: str, experience: str, skills: str, location: str) -> str:
+    def canonicalize_profile_text(self, row: pd.Series) -> str:
         """
-        Canonicalize profile text by merging fields into a clean string.
+        Canonicalize profile text by merging all relevant fields from a row into a clean string.
         
         Args:
-            name: User's name
-            headline: User's headline/title
-            experience: User's experience description
-            skills: User's skills
-            location: User's location
+            row: A pandas Series representing a row from the connections DataFrame.
             
         Returns:
-            Canonicalized text string
+            A single canonicalized text string for vectorization.
         """
-        # Combine all fields
-        combined_text = f"{name} {headline} {experience} {skills} {location}"
+        # Extract all relevant textual information from the row
+        full_name = str(row.get("fullName", "")).strip()
+        headline = str(row.get("headline", "")).strip()
+        about = str(row.get("about", "")).strip()
+        experiences = str(row.get("experiences", "")).strip()
+        education = str(row.get("education", "")).strip()
+        skills = str(row.get("skills", "")).strip()
+        company_name = str(row.get("companyName", "")).strip()
+        location = f"{str(row.get('city', '')).strip()} {str(row.get('country', '')).strip()}".strip()
+
+        # Combine all fields into a comprehensive string
+        combined_text = " ".join(filter(None, [
+            full_name,
+            headline,
+            about,
+            "Past Experience: " + experiences if experiences else "",
+            "Education: " + education if education else "",
+            "Skills: " + skills if skills else "",
+            "Current Company: " + company_name if company_name else "",
+            "Location: " + location if location else ""
+        ]))
         
         # Remove HTML tags
         soup = BeautifulSoup(combined_text, 'html.parser')
@@ -251,7 +266,7 @@ class EmbeddingsService:
             print(f"Error upserting to Pinecone: {e}")
             raise
     
-    def load_connections_data(self, csv_path: str = "Connections.csv") -> pd.DataFrame:
+    def load_connections_data(self, csv_path: str = "updated_connections.csv") -> pd.DataFrame:
         """
         Load connections data from CSV file.
         
@@ -273,23 +288,137 @@ class EmbeddingsService:
     
     def extract_metadata(self, row: pd.Series) -> Dict[str, Any]:
         """
-        Extract metadata from a CSV row according to the specified schema.
+        Extract metadata from a CSV row, ensuring all profile fields are included
+        and data types are compatible with Pinecone (string, number, boolean).
         
         Args:
             row: Pandas Series representing a row from the CSV
             
         Returns:
-            Metadata dictionary
+            Metadata dictionary with flattened profile data.
         """
-        return {
-            "industry": str(row.get("CompanyIndustry", "")).strip() or None,
-            "size": str(row.get("Company size", "")).strip() or None,
-            "city": str(row.get("City", "")).strip() or None,
-            "followers": str(row.get("Followers", "")).strip() or None,
-            "connected_on": str(row.get("Connected On", "")).strip() or None
+        metadata = {}
+
+        # Helper to safely get a value from the row
+        def safe_get(key, default=None):
+            val = row.get(key)
+            # Check for pandas missing values (NaT, nan, None)
+            if pd.isna(val):
+                return default
+            return val
+
+        # Helper to convert to string, returning None for empty strings
+        def to_str(value):
+            if value is None:
+                return None
+            s = str(value).strip()
+            return s if s else None
+
+        # Helper to convert to integer
+        def to_int(value):
+            if value is None:
+                return None
+            try:
+                # Handle cases like '500+' by removing non-digits
+                if isinstance(value, str):
+                    cleaned_value = re.sub(r'[^\d]', '', value)
+                    return int(cleaned_value) if cleaned_value else None
+                return int(float(value))
+            except (ValueError, TypeError):
+                return None
+
+        # Helper to convert to boolean
+        def to_bool(value):
+            if value is None:
+                return False # Default to False for boolean flags
+            if isinstance(value, bool):
+                return value
+            return str(value).lower() in ['true', '1', 't', 'y', 'yes']
+
+        # Define all possible profile fields and their conversion functions
+        # This combines fields from the Connection model and observed CSV columns
+        field_map = {
+            # Personal Info
+            'fullName': to_str,
+            'firstName': to_str,
+            'lastName': to_str,
+            'headline': to_str,
+            'about': to_str,
+            'description': to_str,
+            'city': to_str,
+            'state': to_str,
+            'country': to_str,
+            'location': to_str,
+            'profilePicture': to_str,
+            'publicIdentifier': to_str,
+            'linkedin_url': to_str,
+            'email_address': to_str,
+            
+            # Connection & Stats
+            'connected_on': to_str,
+            'followerCount': to_int,
+            'followers': to_int,
+            'connectionsCount': to_int,
+            
+            # Flags
+            'isCreator': to_bool,
+            'isPremium': to_bool,
+            'isTopVoice': to_bool,
+            'isOpenToWork': to_bool,
+            'isHiring': to_bool,
+            'isInfluencer': to_bool,
+            
+            # Professional Details
+            'title': to_str,
+            'experiences': to_str,
+            'education': to_str,
+            'skills': to_str,
+            'schoolName': to_str,
+            'pronoun': to_str,
+            'associated_hashtags': to_str,
+            
+            # Company Details
+            'companyName': to_str,
+            'company': to_str,
+            'company_size': to_str,
+            'company_website': to_str,
+            'company_phone': to_str,
+            'company_industry': to_str,
+            'company_industry_topics': to_str,
+            'company_description': to_str,
+            'company_address': to_str,
+            'company_city': to_str,
+            'company_state': to_str,
+            'company_country': to_str,
+            'company_revenue': to_str,
+            'company_latest_funding': to_str,
+            'company_linkedin': to_str,
+            'urn': to_str,
         }
+
+        for field, converter in field_map.items():
+            value = safe_get(field)
+            if value is not None:
+                converted_value = converter(value)
+                # Add to metadata only if it's not None and not an empty string
+                if converted_value is not None and converted_value != '':
+                    # Use a consistent key, e.g., 'companyName' over 'company'
+                    key = 'companyName' if field == 'company' else field
+                    key = 'followerCount' if field == 'followers' else key
+                    if key not in metadata: # Prioritize first-seen key
+                        metadata[key] = converted_value
+
+        # Post-processing to ensure consistency
+        if 'fullName' not in metadata and ('firstName' in metadata or 'lastName' in metadata):
+            first = metadata.get('firstName', '') or ''
+            last = metadata.get('lastName', '') or ''
+            full_name = f"{first} {last}".strip()
+            if full_name:
+                metadata['fullName'] = full_name
+
+        return metadata
     
-    async def process_profiles_and_upsert(self, csv_path: str = "Connections.csv", user_id: str = "default_user", chunk_size: int = 100) -> Dict[str, Any]:
+    async def process_profiles_and_upsert(self, csv_path: str = "updated_connections.csv", user_id: str = "default_user", chunk_size: int = 100) -> Dict[str, Any]:
         """
         Process all profiles from CSV in chunks, generate embeddings in batches, and upsert to Pinecone.
         
@@ -328,32 +457,26 @@ class EmbeddingsService:
                     # First pass: extract and validate profile data
                     for index, row in chunk_df.iterrows():
                         try:
-                            # Extract profile information
-                            name = f"{row.get('FirstName', '')} {row.get('LastName', '')}".strip()
-                            headline = str(row.get('Title', '')).strip()
-                            experience = str(row.get('Description/0', '')).strip()
-                            skills = ""  # Not available in current CSV structure
-                            location = f"{row.get('City', '')} {row.get('State', '')} {row.get('Country', '')}".strip()
+                            # Use 'urn' as the primary unique identifier, fallback to publicIdentifier, then linkedin_url
+                            profile_id = str(row.get('urn', '')).strip()
+                            if not profile_id:
+                                profile_id = str(row.get('publicIdentifier', '')).strip()
+                            if not profile_id:
+                                profile_id = str(row.get('linkedin_url', '')).strip()
                             
+                            # Fallback to a row-based ID if still no identifier
+                            if not profile_id:
+                                profile_id = f"profile_{total_rows + index}"
+
                             # Skip if essential data is missing
-                            if not name or name == " ":
+                            if not str(row.get('fullName', '')).strip():
                                 continue
                             
-                            # Generate profile ID (using LinkedIn URL or row index)
-                            linkedin_url = str(row.get('LinkedinUrl', '')).strip()
-                            profile_id = linkedin_url if linkedin_url else f"profile_{index}"
-                            
-                            # Canonicalize profile text
-                            canonical_text = self.canonicalize_profile_text(
-                                name=name,
-                                headline=headline,
-                                experience=experience,
-                                skills=skills,
-                                location=location
-                            )
+                            # Canonicalize the entire row's text for vectorization
+                            canonical_text = self.canonicalize_profile_text(row)
                             
                             # Skip if canonical text is too short
-                            if len(canonical_text.strip()) < 10:
+                            if len(canonical_text.strip()) < 20: # Increased threshold for meaningful content
                                 continue
                             
                             # Check for cached embedding first
@@ -361,8 +484,7 @@ class EmbeddingsService:
                             if cached_embedding:
                                 # Use cached embedding
                                 metadata = self.extract_metadata(row)
-                                metadata["name"] = name
-                                metadata["canonical_text"] = canonical_text
+                                metadata["canonical_text"] = canonical_text # Add canonical text to metadata
                                 chunk_vectors.append((profile_id, cached_embedding, metadata))
                                 chunk_processed_count += 1
                             else:
@@ -370,15 +492,13 @@ class EmbeddingsService:
                                 batch_data.append({
                                     'profile_id': profile_id,
                                     'canonical_text': canonical_text,
-                                    'name': name,
                                     'row': row,
-                                    'index': index
                                 })
                                 valid_rows.append(row)
                             
                         except Exception as e:
                             chunk_error_count += 1
-                            print(f"Error preparing row {index} in chunk {chunk_number}: {e}")
+                            print(f"Error preparing row {total_rows + index} in chunk {chunk_number}: {e}")
                             continue
                     
                     # Generate embeddings for the batch (if any)
@@ -395,15 +515,14 @@ class EmbeddingsService:
                                 item = batch_data[i]
                                 profile_id = item['profile_id']
                                 
-                                # Cache the embedding
+                                # Cache the new embedding
                                 await self.cache_embedding(profile_id, embedding)
                                 
-                                # Extract metadata
+                                # Extract metadata from the new columns
                                 metadata = self.extract_metadata(item['row'])
-                                metadata["name"] = item['name']
-                                metadata["canonical_text"] = item['canonical_text']
+                                metadata["canonical_text"] = item['canonical_text'] # Add canonical text to metadata
                                 
-                                # Add to chunk vectors list
+                                # Add to chunk vectors list for upserting
                                 chunk_vectors.append((profile_id, embedding, metadata))
                                 chunk_processed_count += 1
                                 

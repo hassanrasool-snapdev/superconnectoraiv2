@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, Any
 from app.services.pinecone_index_service import pinecone_index_service
+from app.services.auth_service import get_current_user
+from app.models.user import UserInDB
 
 router = APIRouter(prefix="/api/v1/pinecone", tags=["pinecone"])
 
@@ -94,3 +96,25 @@ async def delete_pinecone_index():
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete Pinecone index: {str(e)}")
+
+
+@router.delete("/namespace/clear", response_model=Dict[str, Any])
+async def clear_pinecone_namespace(current_user: dict = Depends(get_current_user)):
+    """
+    Clear a namespace in the Pinecone index.
+    The namespace is the user_id of the current user.
+    
+    Returns:
+        Dictionary containing the result of the operation
+    """
+    try:
+        user_id = str(current_user["id"])
+        result = pinecone_index_service.clear_namespace(namespace=user_id)
+        
+        if not result["success"]:
+            raise HTTPException(status_code=500, detail=result["message"])
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear Pinecone namespace: {str(e)}")

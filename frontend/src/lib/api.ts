@@ -287,3 +287,16 @@ export async function getFavoritesCount(token: string): Promise<{ count: number 
     }
     return response.json();
 }
+
+export async function clearPineconeData(token: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/pinecone/namespace/clear`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to clear pinecone data');
+    }
+    return response.json();
+}

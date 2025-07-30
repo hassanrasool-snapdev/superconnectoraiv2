@@ -19,7 +19,10 @@ export default function DashboardPage() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim() || !token) return;
+    if (!query.trim() || !token) {
+      setError('Authentication token is not available. Please log in again.');
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -27,6 +30,9 @@ export default function DashboardPage() {
 
     try {
       const searchResults = await searchConnections({ query: query.trim() }, token);
+      console.log('Raw search results from API:', JSON.stringify(searchResults, null, 2));
+      
+      // @ts-ignore
       setResults(searchResults);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
@@ -105,8 +111,29 @@ export default function DashboardPage() {
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-start space-x-4">
                       {/* Avatar */}
-                      <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-                        <User className="w-6 h-6 text-gray-500" />
+                      <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+                        {result.connection.profile_picture ? (
+                          <img
+                            src={result.connection.profile_picture}
+                            alt={`${result.connection.first_name} ${result.connection.last_name}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.onerror = null;
+                              target.style.display = 'none';
+                              
+                              const parent = target.parentElement;
+                              if (parent) {
+                                const fallback = document.createElement('div');
+                                fallback.className = 'w-full h-full flex items-center justify-center';
+                                fallback.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-8 h-8 text-gray-500"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+                                parent.appendChild(fallback);
+                              }
+                            }}
+                          />
+                        ) : (
+                          <User className="w-8 h-8 text-gray-500" />
+                        )}
                       </div>
                       
                       {/* Name and title */}
@@ -114,11 +141,20 @@ export default function DashboardPage() {
                         <h3 className="text-lg font-semibold text-gray-900">
                           {result.connection.first_name} {result.connection.last_name}
                         </h3>
+                        {result.connection.company_name && (
+                          <p className="text-md font-semibold text-gray-800 mt-1">
+                            {result.connection.company_name}
+                          </p>
+                        )}
                         <p className="text-gray-600">
-                          {result.connection.title && result.connection.company ? (
-                            `${result.connection.title} at ${result.connection.company}`
-                          ) : result.connection.title || result.connection.company || (
-                            'No company information available'
+                          {result.connection.headline || result.connection.title ? (
+                            <>
+                              {result.connection.headline}
+                              {result.connection.headline && result.connection.title ? ' | ' : ''}
+                              {result.connection.title}
+                            </>
+                          ) : (
+                            'No headline or title available'
                           )}
                         </p>
                         {result.connection.email_address && (
@@ -146,16 +182,26 @@ export default function DashboardPage() {
                         </Badge>
                       )}
                       <div className="text-right">
-                        <div className="text-2xl font-bold text-blue-600">{result.score.toFixed(1)}</div>
+                        <div className="text-2xl font-bold text-blue-600">{result.score}</div>
                         <div className="text-xs text-gray-500">Relevance</div>
                       </div>
                       {result.connection.linkedin_url && (
-                        <Linkedin 
+                        <Linkedin
                           className="w-5 h-5 text-blue-600 cursor-pointer hover:text-blue-700"
                           onClick={() => window.open(result.connection.linkedin_url!, '_blank')}
                         />
                       )}
                     </div>
+                  </div>
+
+                  {/* Badges */}
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {result.connection.is_premium && <Badge className="bg-purple-600 hover:bg-purple-700 text-white">Premium</Badge>}
+                    {result.connection.is_top_voice && <Badge className="bg-blue-500 hover:bg-blue-600 text-white">Top Voice</Badge>}
+                    {result.connection.is_influencer && <Badge className="bg-pink-500 hover:bg-pink-600 text-white">Influencer</Badge>}
+                    {result.connection.is_hiring && <Badge className="bg-green-500 hover:bg-green-600 text-white">Hiring</Badge>}
+                    {result.connection.is_open_to_work && <Badge className="bg-teal-500 hover:bg-teal-600 text-white">Open to Work</Badge>}
+                    {result.connection.is_creator && <Badge className="bg-indigo-500 hover:bg-indigo-600 text-white">Creator</Badge>}
                   </div>
 
                   {/* Summary */}
@@ -212,10 +258,10 @@ export default function DashboardPage() {
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h3 className="text-lg font-semibold mb-3">Getting Started</h3>
             <div className="space-y-2 text-sm text-gray-600">
-              <p>• Use natural language to describe who you&apos;re looking for</p>
-              <p>• Try queries like &quot;VCs who invest in seed stage consumer startups&quot;</p>
+              <p>• Use natural language to describe who you're looking for</p>
+              <p>• Try queries like "VCs who invest in seed stage consumer startups"</p>
               <p>• The AI will analyze your connections and provide detailed match analysis</p>
-              <p>• Connections with scores 9-10 are marked as &quot;Top Matches&quot;</p>
+              <p>• Connections with scores 9-10 are marked as "Top Matches"</p>
             </div>
           </div>
         )}

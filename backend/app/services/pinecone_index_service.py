@@ -24,6 +24,7 @@ class PineconeIndexService:
                 region=settings.PINECONE_REGION
             )
         }
+        self.index = self.client.Index(self.index_name)
     
     def index_exists(self) -> bool:
         """
@@ -174,6 +175,39 @@ class PineconeIndexService:
                 "success": False,
                 "message": error_msg,
                 "deleted": False
+            }
+    def clear_namespace(self, namespace: str) -> Dict[str, Any]:
+        """
+        Clear all vectors from a specific namespace in the Pinecone index.
+
+        Args:
+            namespace: The namespace to clear.
+
+        Returns:
+            Dictionary containing the result of the operation.
+        """
+        try:
+            print(f"Clearing namespace '{namespace}' in index '{self.index_name}'...")
+            
+            if not self.index_exists():
+                return {
+                    "success": False,
+                    "message": f"Index '{self.index_name}' does not exist. Cannot clear namespace.",
+                }
+
+            self.index.delete(delete_all=True, namespace=namespace)
+            
+            return {
+                "success": True,
+                "message": f"Successfully cleared namespace '{namespace}'"
+            }
+            
+        except Exception as e:
+            error_msg = f"Error clearing namespace '{namespace}': {e}"
+            print(error_msg)
+            return {
+                "success": False,
+                "message": error_msg
             }
     
     def setup_index(self) -> Dict[str, Any]:

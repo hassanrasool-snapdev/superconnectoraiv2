@@ -10,16 +10,26 @@ export interface Connection {
   first_name: string;
   last_name: string;
   linkedin_url?: string | null;
+  profile_picture?: string | null;
   email_address?: string | null;
   city?: string | null;
   state?: string | null;
   country?: string | null;
   followers?: string | null;
   description?: string | null;
-  
+  headline?: string | null;
+
   // Connection Information
   connected_on?: string | null;
   
+  // Boolean Flags
+  is_creator?: boolean | null;
+  is_hiring?: boolean | null;
+  is_influencer?: boolean | null;
+  is_open_to_work?: boolean | null;
+  is_premium?: boolean | null;
+  is_top_voice?: boolean | null;
+
   // Current Company Information
   company?: string | null;
   title?: string | null;

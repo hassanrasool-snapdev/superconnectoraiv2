@@ -52,7 +52,7 @@ async def upload_connections(
     user_id = UUID(current_user["id"])
     
     # Process CSV upload to database first
-    count = await connections_service.process_csv_upload(db, file, user_id)
+    count = await connections_service.process_and_store_connections(db, file, user_id)
     
     # Save uploaded file to temporary location for embedding processing
     # Reset file pointer to beginning

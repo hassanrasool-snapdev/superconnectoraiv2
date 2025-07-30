@@ -115,6 +115,37 @@ async def test_hybrid_query_simulation():
     else:
         print("Pinecone index not available - hybrid query would fail")
 
+async def test_end_to_end_search():
+    """Test the full retrieve_and_rerank pipeline."""
+    print("=" * 50)
+    print("Testing End-to-End Search")
+    print("=" * 50)
+    
+    test_query = "venture capitalist"
+    print(f"Performing search with query: '{test_query}'")
+    
+    try:
+        results = await retrieval_service.retrieve_and_rerank(
+            user_query=test_query,
+            user_id="default_user" # Make sure this namespace exists
+        )
+        
+        if results:
+            print(f"Successfully retrieved {len(results)} results.")
+            # Print details of the top result
+            top_result = results[0]
+            print("\n--- Top Result ---")
+            print(f"Score: {top_result['score']}")
+            print(f"Pro: {top_result['pro']}")
+            print(f"Con: {top_result['con']}")
+            print(f"Profile: {top_result['profile']}")
+            print("--------------------")
+        else:
+            print("Search completed, but no results were returned.")
+            
+    except Exception as e:
+        print(f"An error occurred during the end-to-end search test: {e}")
+
 async def main():
     """Run all tests."""
     print("Starting Retrieval Service Tests")
@@ -131,6 +162,9 @@ async def main():
         print("\nSkipping OpenAI-dependent tests (client not available)")
     
     await test_hybrid_query_simulation()
+    
+    # Run the new end-to-end test
+    await test_end_to_end_search()
     
     print("\n" + "=" * 60)
     print("All tests completed!")

@@ -3,17 +3,34 @@ import math
 import asyncio
 import os
 import logging
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 import openai
 import httpx
 from pinecone import Pinecone
 from app.core.config import settings
 from app.services.embeddings_service import embeddings_service
-from app.core.db import get_database
 
 logger = logging.getLogger(__name__)
 
 class RetrievalService:
+    def _to_snake_case(self, name: str) -> str:
+        """Converts a camelCase string to snake_case."""
+        s1 = name[0].lower()
+        for char in name[1:]:
+            if char.isupper():
+                s1 += '_' + char.lower()
+            else:
+                s1 += char
+        return s1
+
+    def _convert_keys_to_snake_case(self, data: Any) -> Any:
+        """Recursively converts dictionary keys from camelCase to snake_case."""
+        if isinstance(data, dict):
+            return {self._to_snake_case(k): self._convert_keys_to_snake_case(v) for k, v in data.items()}
+        if isinstance(data, list):
+            return [self._convert_keys_to_snake_case(i) for i in data]
+        return data
+
     def __init__(self):
         # Initialize OpenAI client
         if not settings.OPENAI_API_KEY:
@@ -105,7 +122,7 @@ Keep the output to 1-2 sentences maximum."""
         alpha: float = 0.6, 
         filter_dict: Optional[Dict[str, Any]] = None,
         namespace: str = "default_user"
-    ) -> List[str]:
+    ) -> List[Dict[str, Any]]:
         """
         Perform hybrid search query on Pinecone index.
         
@@ -117,7 +134,7 @@ Keep the output to 1-2 sentences maximum."""
             namespace: Namespace for tenant isolation
             
         Returns:
-            List of profile IDs from the query response
+            List of profiles from the query response, including metadata
         """
         if not self.index:
             raise ValueError("Pinecone client not initialized. Please check PINECONE_API_KEY configuration.")
@@ -142,16 +159,24 @@ Keep the output to 1-2 sentences maximum."""
             # Execute the query
             query_response = self.index.query(**query_params)
             
-            # Extract profile IDs from matches
-            profile_ids = []
+            # Extract profiles with metadata from matches
+            profiles = []
             for match in query_response.matches:
-                profile_ids.append(match.id)
-                
-            print(f"Retrieved {len(profile_ids)} profile IDs from Pinecone")
-            return profile_ids
+                profile_data = self._convert_keys_to_snake_case(match.metadata)
+                profile_data["id"] = match.id
+                profile_data["profile_id"] = match.id
+                profiles.append(profile_data)
+
+            logger.info(f"Retrieved {len(profiles)} profiles from Pinecone.")
+
+            # Log the first profile's metadata for inspection
+            if profiles:
+                logger.debug(f"Sample profile metadata from Pinecone: {profiles[0]}")
+
+            return profiles
             
         except Exception as e:
-            print(f"Error performing hybrid Pinecone query: {e}")
+            logger.error(f"Error performing hybrid Pinecone query: {e}", exc_info=True)
             raise
     
     def calculate_chunk_size(self) -> int:
@@ -224,7 +249,19 @@ Keep the output to 1-2 sentences maximum."""
             
             try:
                 # Prepare the system prompt
-                system_prompt = "You are a recruiting assistant. For each profile JSON, score 1-10 how well it matches the user query, then list a one-sentence pro and con."
+                system_prompt = """You are a sophisticated recruiting assistant responsible for accurately scoring professional profiles against a user's search query. Your task is to provide a relevance score from 0 to 10, where 10 indicates a perfect match and 0 indicates no relevance.
+
+**Scoring Guidelines:**
+- **10:** Perfect match. The profile explicitly meets all key criteria in the user's query.
+- **9:** Excellent match.
+- **8:** Very good match.
+- **7:** Good match.
+- **5-6:** Average match. Meets some criteria but has notable gaps.
+- **1-3:** Poor match. Tangentially related but not a good fit.
+- **0:** No match. The profile is completely irrelevant to the query.
+
+For each profile, you must also provide a concise, one-sentence "pro" (key strength) and "con" (key weakness) based on the query.
+"""
                 
                 # Prepare the user message with profiles
                 profiles_json = json.dumps(chunk, indent=2)
@@ -234,10 +271,10 @@ Profiles to evaluate:
 {}
 
 Please respond with a JSON array where each object has:
-- "profile_id": the profile identifier (use the "id" field from each profile)
-- "score": integer from 1-10
-- "pro": one sentence explaining the main strength/match
-- "con": one sentence explaining the main limitation/concern
+- "profile_id": The profile identifier (use the "id" field from each profile).
+- "score": An integer from 0 to 10, representing relevance.
+- "pro": A one-sentence explanation of the main strength/match.
+- "con": A one-sentence explanation of the main limitation/concern.
 
 IMPORTANT: For "profile_id", use the exact value from the "id" field of each profile in the JSON above.
 
@@ -245,7 +282,7 @@ Example format:
 [
   {{
     "profile_id": "profile_123",
-    "score": 8,
+    "score": 0.85,
     "pro": "Strong background in required technology with relevant industry experience.",
     "con": "Location might not be ideal for the role requirements."
   }}
@@ -264,7 +301,7 @@ Example format:
                 
                 # Parse the response
                 ai_response = response.choices[0].message.content.strip()
-                logger.debug(f"Raw OpenAI response for re-ranking: {ai_response}")
+                logger.info(f"Raw OpenAI response for re-ranking: {ai_response}")
                 
                 try:
                     # Clean the response before parsing JSON
@@ -301,21 +338,21 @@ Example format:
                             if profile_data:
                                 all_results.append({
                                     "profile": profile_data,
-                                    "score": max(1, min(10, int(result["score"]))),  # Ensure score is 1-10
+                                    "score": max(0, min(10, int(float(result["score"])))),  # Ensure score is 0-10
                                     "pro": result["pro"],
                                     "con": result["con"]
                                 })
-                                print(f"Successfully matched profile_id: {result_profile_id}")
+                                logger.debug(f"Successfully matched profile_id: {result_profile_id}")
                             else:
-                                print(f"Warning: Could not find profile data for profile_id: {result_profile_id}")
-                                print(f"Available profile IDs in chunk: {[str(p.get('id', p.get('profile_id', p.get('_id', 'unknown')))) for p in chunk]}")
+                                logger.warning(f"Could not find profile data for profile_id: {result_profile_id}")
+                                logger.warning(f"Available profile IDs in chunk: {[str(p.get('id', p.get('profile_id', p.get('_id', 'unknown')))) for p in chunk]}")
                                 
                 except json.JSONDecodeError:
-                    print(f"Failed to parse JSON response for chunk {i//chunk_size + 1}: {ai_response}")
+                    logger.error(f"Failed to parse JSON response for chunk {i//chunk_size + 1}: {ai_response}")
                     raise
                         
             except Exception as e:
-                print(f"Error processing chunk {i//chunk_size + 1}: {e}")
+                logger.error(f"Error processing chunk {i//chunk_size + 1}: {e}", exc_info=True)
                 raise
         
         # Sort by score descending
@@ -323,48 +360,6 @@ Example format:
         
         print(f"Re-ranked {len(all_results)} profiles using OpenAI")
         return all_results
-    
-    async def fetch_profile_data(self, profile_ids: List[str], user_id: str) -> List[Dict[str, Any]]:
-        """
-        Fetch full profile data for the given profile IDs from the database.
-        
-        Args:
-            profile_ids: List of profile IDs to fetch
-            user_id: User ID for database queries
-            
-        Returns:
-            List of full profile data dictionaries
-        """
-        try:
-            db = get_database()
-            connections_collection = db.connections
-            
-            # Query for profiles by their LinkedIn URLs or profile IDs
-            profiles = []
-            async for profile in connections_collection.find({
-                "$or": [
-                    {"linkedin_url": {"$in": profile_ids}},
-                    {"_id": {"$in": profile_ids}}
-                ],
-                "user_id": user_id
-            }):
-                # Convert MongoDB document to clean dict
-                clean_profile = {}
-                for key, value in profile.items():
-                    if key == "_id":
-                        clean_profile["id"] = str(value)
-                        clean_profile["profile_id"] = str(value)
-                    else:
-                        clean_profile[key] = value
-                        
-                profiles.append(clean_profile)
-            
-            print(f"Fetched {len(profiles)} full profiles from database")
-            return profiles
-            
-        except Exception as e:
-            print(f"Error fetching profile data: {e}")
-            return []
     
     async def retrieve_and_rerank(
         self, 
@@ -386,7 +381,7 @@ Example format:
             List of re-ranked and annotated results
         """
         try:
-            print(f"Starting retrieval and re-ranking for query: '{user_query}'")
+            logger.info(f"Starting retrieval and re-ranking for query: '{user_query}'")
             
             # Step 1: Optional query rewrite
             processed_query = await self.rewrite_query_with_llm(user_query, enable_query_rewrite)
@@ -395,7 +390,8 @@ Example format:
             query_embedding = await embeddings_service.generate_embedding(processed_query)
             
             # Step 3: Execute hybrid query against Pinecone
-            profile_ids = await self.hybrid_pinecone_query(
+            # Step 3: Execute hybrid query against Pinecone
+            candidate_profiles = await self.hybrid_pinecone_query(
                 vector=query_embedding,
                 top_k=30,
                 alpha=0.6,
@@ -403,28 +399,31 @@ Example format:
                 namespace=user_id
             )
             
-            if not profile_ids:
-                print("No profiles found in Pinecone query")
-                return []
-            
-            # Step 4: Fetch full profile data for candidates
-            candidate_profiles = await self.fetch_profile_data(profile_ids, user_id)
-            
             if not candidate_profiles:
-                print("No full profile data found for candidates")
+                logger.warning("No profiles found in Pinecone query")
                 return []
             
-            # Step 5: Chunk and re-rank candidates using OpenAI
+            logger.info(f"Re-ranking {len(candidate_profiles)} candidates.")
+            # Step 4: Chunk and re-rank candidates using OpenAI
             reranked_results = await self.rerank_with_openai(candidate_profiles, user_query)
             
             # Step 6: Limit results to top 20
             final_results = reranked_results[:20]
             
-            print(f"Retrieval and re-ranking completed. Returning {len(final_results)} results (limited from {len(reranked_results)})")
+            logger.info(f"Total final results: {len(final_results)}")
+            # Log details of the first 3 profiles for inspection
+            for i, result in enumerate(final_results[:3]):
+                profile_info = result.get('profile', {})
+                logger.info(f"Profile {i+1} ID: {profile_info.get('id')}")
+                logger.info(f"Profile {i+1} Score: {result.get('score')}")
+                logger.info(f"Profile {i+1} Company: {profile_info.get('company_name', 'N/A')}")
+                logger.info(f"Profile {i+1} Keys: {list(profile_info.keys())}")
+
+            logger.info(f"Retrieval and re-ranking completed. Returning {len(final_results)} results (limited from {len(reranked_results)})")
             return final_results
             
         except Exception as e:
-            print(f"Error in retrieve_and_rerank: {e}")
+            logger.error(f"Error in retrieve_and_rerank: {e}", exc_info=True)
             raise
 
 # Global instance
