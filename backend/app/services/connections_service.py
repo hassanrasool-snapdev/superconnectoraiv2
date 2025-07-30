@@ -64,7 +64,12 @@ async def process_and_store_connections(db, file: UploadFile, user_id: UUID):
         records_to_insert.append(connection_dict)
 
     if records_to_insert:
-        await db.connections.insert_many(records_to_insert)
+        try:
+            await db.connections.insert_many(records_to_insert, ordered=False)
+        except Exception as e:
+            # This will catch errors like duplicate keys if any slip through,
+            # but with `ordered=False`, it will attempt to insert all non-dups.
+            print(f"An error occurred during bulk insert, but some records may have been inserted: {e}")
     
     return len(records_to_insert)
 
