@@ -75,6 +75,45 @@ async def upload_connections(
         "message": f"Successfully uploaded and processed {count} connections. Embedding processing started in background."
     }
 
+@router.post("/connections/ingest", status_code=status.HTTP_201_CREATED)
+async def ingest_connections(
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    user_id = UUID(current_user["id"])
+    
+    # Construct path to data.csv, assuming it's in the backend directory
+    # This makes the path relative to this file's location
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    csv_file_path = os.path.join(base_dir, "data.csv")
+
+    if not os.path.exists(csv_file_path):
+        raise HTTPException(status_code=404, detail=f"File not found at {csv_file_path}")
+
+    # Process CSV upload to database first
+    with open(csv_file_path, 'rb') as f:
+        # We need to pass a file-like object to the service
+        # The service expects an UploadFile, so we create a temporary one
+        upload_file = UploadFile(filename="data.csv", file=f)
+        count = await connections_service.process_and_store_connections(db, upload_file, user_id)
+
+    # For the background task, we need a temporary copy of the file because the original file handle will be closed.
+    with tempfile.NamedTemporaryFile(mode='wb', suffix='.csv', delete=False) as temp_file:
+        with open(csv_file_path, 'rb') as original_file:
+            temp_file.write(original_file.read())
+        temp_file_path = temp_file.name
+
+    # Add background task to process embeddings
+    background_tasks.add_task(
+        process_embeddings_background,
+        csv_file_path=temp_file_path,
+        user_id=str(user_id)
+    )
+    
+    return {
+        "message": f"Successfully ingested and processed {count} connections. Embedding processing started in background."
+    }
 @router.get("/connections", response_model=List[ConnectionPublic])
 async def get_connections(
     current_user: dict = Depends(get_current_user),
