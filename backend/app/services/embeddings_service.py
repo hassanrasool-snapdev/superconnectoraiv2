@@ -163,17 +163,8 @@ class EmbeddingsService:
         Returns:
             Cached embedding vector or None if not found
         """
-        try:
-            db = get_database()
-            cache_collection = db.embedding_cache
-            
-            cached_result = await cache_collection.find_one({"profile_id": profile_id})
-            if cached_result:
-                return cached_result.get("embedding")
-            return None
-        except Exception as e:
-            print(f"Error retrieving cached embedding: {e}")
-            return None
+        # Caching disabled to prevent disk space issues on deployment environment.
+        return None
     
     async def cache_embedding(self, profile_id: str, embedding: List[float]) -> None:
         """
@@ -183,25 +174,8 @@ class EmbeddingsService:
             profile_id: Profile ID
             embedding: Embedding vector to cache
         """
-        try:
-            db = get_database()
-            cache_collection = db.embedding_cache
-            
-            await cache_collection.update_one(
-                {"profile_id": profile_id},
-                {
-                    "$set": {
-                        "profile_id": profile_id,
-                        "embedding": embedding,
-                        "created_at": datetime.utcnow(),
-                        "model": self.embedding_model
-                    }
-                },
-                upsert=True
-            )
-        except Exception as e:
-            print(f"Error caching embedding: {e}")
-            raise
+        # Caching disabled to prevent disk space issues on deployment environment.
+        return
     
     async def get_or_generate_embedding(self, profile_id: str, text: str) -> List[float]:
         """

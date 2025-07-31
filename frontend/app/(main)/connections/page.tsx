@@ -53,19 +53,11 @@ export default function ConnectionsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Description</TableHead>
+              <TableHead>Headline</TableHead>
               <TableHead>LinkedIn</TableHead>
               <TableHead>Company</TableHead>
-              <TableHead>Title</TableHead>
-              <TableHead>Industry</TableHead>
-              <TableHead>Industry Topics</TableHead>
               <TableHead>Location</TableHead>
-              <TableHead>Connected</TableHead>
               <TableHead>Followers</TableHead>
-              <TableHead>Company Details</TableHead>
-              <TableHead>Company Location</TableHead>
-              <TableHead>Company Contact</TableHead>
-              <TableHead>Company Financials</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -80,8 +72,8 @@ export default function ConnectionsPage() {
                   </div>
                 </TableCell>
                 <TableCell className="text-sm max-w-xs">
-                  <div className="truncate" title={conn.description || 'N/A'}>
-                    {conn.description || 'N/A'}
+                  <div className="truncate" title={conn.headline || 'N/A'}>
+                    {conn.headline || 'N/A'}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -116,83 +108,11 @@ export default function ConnectionsPage() {
                     )}
                   </div>
                 </TableCell>
-                <TableCell>{conn.title || 'N/A'}</TableCell>
-                <TableCell className="text-sm">{conn.company_industry || 'N/A'}</TableCell>
-                <TableCell className="text-sm max-w-xs">
-                  <div className="truncate" title={conn.company_industry_topics || 'N/A'}>
-                    {conn.company_industry_topics || 'N/A'}
-                  </div>
-                </TableCell>
                 <TableCell className="text-sm">
                   {[conn.city, conn.state, conn.country].filter(Boolean).join(', ') || 'N/A'}
                 </TableCell>
-                <TableCell className="text-sm">{conn.connected_on || 'N/A'}</TableCell>
                 <TableCell className="text-sm">{conn.followers || 'N/A'}</TableCell>
-                <TableCell className="text-sm">
-                  <div className="space-y-1">
-                    {conn.company_size && (
-                      <div><span className="font-medium">Size:</span> {conn.company_size}</div>
-                    )}
-                    {conn.company_description && (
-                      <div className="max-w-xs">
-                        <span className="font-medium">Description:</span>
-                        <div className="truncate text-xs" title={conn.company_description}>
-                          {conn.company_description}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="text-sm">
-                  <div className="space-y-1">
-                    {conn.company_address && (
-                      <div className="text-xs">{conn.company_address}</div>
-                    )}
-                    {[conn.company_city, conn.company_state, conn.company_country].filter(Boolean).length > 0 && (
-                      <div className="text-xs">
-                        {[conn.company_city, conn.company_state, conn.company_country].filter(Boolean).join(', ')}
-                      </div>
-                    )}
-                    {!conn.company_address && [conn.company_city, conn.company_state, conn.company_country].filter(Boolean).length === 0 && (
-                      <span className="text-gray-400">N/A</span>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="text-sm">
-                  <div className="space-y-1">
-                    {conn.company_phone && (
-                      <div><span className="font-medium">Phone:</span> {conn.company_phone}</div>
-                    )}
-                    {conn.company_linkedin && (
-                      <div>
-                        <a
-                          href={conn.company_linkedin}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 text-xs"
-                        >
-                          Company LinkedIn
-                        </a>
-                      </div>
-                    )}
-                    {!conn.company_phone && !conn.company_linkedin && (
-                      <span className="text-gray-400">N/A</span>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="text-sm">
-                  <div className="space-y-1">
-                    {conn.company_revenue && (
-                      <div><span className="font-medium">Revenue:</span> {conn.company_revenue}</div>
-                    )}
-                    {conn.company_latest_funding && (
-                      <div><span className="font-medium">Funding:</span> {conn.company_latest_funding}</div>
-                    )}
-                    {!conn.company_revenue && !conn.company_latest_funding && (
-                      <span className="text-gray-400">N/A</span>
-                    )}
-                  </div>
-                </TableCell>
+                <TableCell className="text-sm">{conn.followers || 'N/A'}</TableCell>
               </TableRow>
             ))}
           </TableBody>

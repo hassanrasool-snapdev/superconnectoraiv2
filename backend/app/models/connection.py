@@ -13,6 +13,7 @@ class ConnectionBase(BaseModel):
     country: Optional[str] = None
     followers: Optional[str] = None
     description: Optional[str] = None
+    headline: Optional[str] = None
     
     # Connection Information
     connected_on: Optional[str] = None

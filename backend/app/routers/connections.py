@@ -86,7 +86,7 @@ async def ingest_connections(
     # Construct path to data.csv, assuming it's in the backend directory
     # This makes the path relative to this file's location
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    csv_file_path = os.path.join(base_dir, "data.csv")
+    csv_file_path = os.path.join(base_dir, "updated_connections.csv")
 
     if not os.path.exists(csv_file_path):
         raise HTTPException(status_code=404, detail=f"File not found at {csv_file_path}")

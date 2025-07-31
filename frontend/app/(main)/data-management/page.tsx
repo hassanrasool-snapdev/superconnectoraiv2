@@ -59,8 +59,8 @@ export default function DataManagementPage() {
     setMessage('');
     setError('');
     try {
-      const result = await clearPineconeData(token);
-      setMessage(result.message + ' You can now upload your new file.');
+      await deleteConnections(token);
+      setMessage('Successfully cleared connections. You can now upload your new file.');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Clearing failed');
     } finally {

@@ -20,38 +20,39 @@ async def process_and_store_connections(db, file: UploadFile, user_id: UUID):
         # You might need to adjust this mapping based on the actual CSV format.
         record = {
             # Personal Information
-            "first_name": row.get("First Name", ""),
-            "last_name": row.get("Last Name", ""),
-            "linkedin_url": row.get("LinkedinUrl") or None,
-            "email_address": row.get("Email Address") or None,
-            "city": row.get("City") or None,
-            "state": row.get("State") or None,
-            "country": row.get("Country") or None,
-            "followers": row.get("Followers") or None,
-            "description": row.get("Description/0") or None,
+            "first_name": row.get("firstName", ""),
+            "last_name": row.get("lastName", ""),
+            "linkedin_url": f"https://www.linkedin.com/in/{row.get('publicIdentifier')}" if row.get('publicIdentifier') else None,
+            "email_address": None,  # Not available in new CSV
+            "city": row.get("city") or None,
+            "state": None,  # Not available in new CSV
+            "country": row.get("country") or None,
+            "followers": row.get("followerCount") or None,
+            "description": row.get("about") or None,
+            "headline": row.get("headline") or None,
             
             # Connection Information
-            "connected_on": row.get("Connected On") or None,
+            "connected_on": None,  # Not available in new CSV
             
             # Current Company Information
-            "company": row.get("Company") or None,
-            "title": row.get("Title") or None,
+            "company": row.get("companyName") or None,
+            "title": None,  # Not available in new CSV
             
             # Company Details
-            "company_size": row.get("Company size") or None,
-            "company_name": row.get("CompanyName") or None,
-            "company_website": row.get("CompanyWebsite") or None,
-            "company_phone": row.get("CompanyPhone/0") or None,
-            "company_industry": row.get("CompanyIndustry") or None,
-            "company_industry_topics": row.get("CompanyIndustryTopics") or None,
-            "company_description": row.get("CompanyDescription") or None,
-            "company_address": row.get("CompanyAddress/0") or None,
-            "company_city": row.get("CompanyCity/0") or None,
-            "company_state": row.get("CompanyState/0") or None,
-            "company_country": row.get("CompanyCountry/0") or None,
-            "company_revenue": row.get("CompanyRevenue") or None,
-            "company_latest_funding": row.get("CompanyLatestFunding/0") or None,
-            "company_linkedin": row.get("CompanyLinkedIn") or None,
+            "company_size": None,  # Not available in new CSV
+            "company_name": row.get("companyName") or None,
+            "company_website": None,  # Not available in new CSV
+            "company_phone": None,  # Not available in new CSV
+            "company_industry": None,  # Not available in new CSV
+            "company_industry_topics": None,  # Not available in new CSV
+            "company_description": None,  # Not available in new CSV
+            "company_address": None,  # Not available in new CSV
+            "company_city": None,  # Not available in new CSV
+            "company_state": None,  # Not available in new CSV
+            "company_country": None,  # Not available in new CSV
+            "company_revenue": None,  # Not available in new CSV
+            "company_latest_funding": None,  # Not available in new CSV
+            "company_linkedin": None,  # Not available in new CSV
         }
         record['user_id'] = user_id
         

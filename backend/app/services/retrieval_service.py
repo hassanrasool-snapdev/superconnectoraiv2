@@ -165,6 +165,10 @@ Keep the output to 1-2 sentences maximum."""
                 profile_data = self._convert_keys_to_snake_case(match.metadata)
                 profile_data["id"] = match.id
                 profile_data["profile_id"] = match.id
+                # Construct linkedin_url if public_identifier is available and linkedin_url is missing
+                if 'public_identifier' in profile_data and not profile_data.get('linkedin_url'):
+                    profile_data['linkedin_url'] = f"https://www.linkedin.com/in/{profile_data['public_identifier']}"
+                
                 profiles.append(profile_data)
 
             logger.info(f"Retrieved {len(profiles)} profiles from Pinecone.")
