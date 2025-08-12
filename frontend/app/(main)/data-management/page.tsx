@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '../../../src/context/AuthContext';
-import { uploadConnectionsCSV, deleteConnections } from '../../../src/lib/api';
+import { uploadConnectionsCSV, deleteConnections, clearPineconeData } from '../../../src/lib/api';
 import { Button } from "../../../src/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "../../../src/components/ui/card";
 import { Input } from "../../../src/components/ui/input";
