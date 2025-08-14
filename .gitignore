@@ -94,3 +94,4 @@ pids
 *.pid
 *.seed
 *.pid.lock
+backend/.venv

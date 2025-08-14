@@ -77,12 +77,16 @@ async def ai_search_connections(
         # Convert to the expected SearchResult format
         search_results = []
         for result in paginated_results:
+            # Use enhanced pros and cons if available, fallback to single pro/con
+            pros = result.get("pros", [result.get("pro", "Strong candidate match.")])
+            cons = result.get("cons", [result.get("con", "Some limitations may apply.")])
+            
             search_results.append(SearchResult(
                 connection=result["profile"],
                 score=result["score"],
-                summary=result["pro"],  # Use pro as summary
-                pros=[result["pro"]],
-                cons=[result["con"]]
+                summary=result.get("pro", pros[0] if pros else "Strong candidate match."),  # Use first pro as summary
+                pros=pros,
+                cons=cons
             ))
         
         # Save search to history
@@ -160,12 +164,16 @@ async def ai_search_connections_stream(
                 # Convert to the expected SearchResult format
                 search_results = []
                 for result in chunk:
+                    # Use enhanced pros and cons if available, fallback to single pro/con
+                    pros = result.get("pros", [result.get("pro", "Strong candidate match.")])
+                    cons = result.get("cons", [result.get("con", "Some limitations may apply.")])
+                    
                     search_results.append({
                         "connection": result["profile"],
                         "score": result["score"],
-                        "summary": result["pro"],
-                        "pros": [result["pro"]],
-                        "cons": [result["con"]]
+                        "summary": result.get("pro", pros[0] if pros else "Strong candidate match."),
+                        "pros": pros,
+                        "cons": cons
                     })
                 
                 # Send chunk of results

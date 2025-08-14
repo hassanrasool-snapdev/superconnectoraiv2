@@ -74,8 +74,12 @@ export async function uploadConnectionsCSV(file: File, token: string): Promise<{
     return response.json();
 }
 
-export async function getConnections(token: string, page: number = 1, limit: number = 10): Promise<Connection[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/connections?page=${page}&limit=${limit}`, {
+export async function getConnections(token: string, page: number = 1, limit: number = 10, minRating?: number): Promise<Connection[]> {
+    let url = `${API_BASE_URL}/api/v1/connections?page=${page}&limit=${limit}`;
+    if (minRating) {
+        url += `&min_rating=${minRating}`;
+    }
+    const response = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
     });
 

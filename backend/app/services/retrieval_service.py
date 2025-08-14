@@ -186,16 +186,14 @@ Keep the output to 1-2 sentences maximum."""
     def calculate_chunk_size(self) -> int:
         """
         Calculate the chunk size for profiles to send to the re-ranking model.
-        Formula: chunk_size = floor((128_000 - prompt_tokens) / avg_profile_tokens)
+        With enhanced pros/cons, we need smaller chunks to avoid response truncation.
         
         Returns:
             Calculated chunk size
         """
-        available_tokens = self.TOTAL_TOKEN_LIMIT - self.ESTIMATED_PROMPT_TOKENS
-        chunk_size = math.floor(available_tokens / self.ESTIMATED_AVG_PROFILE_TOKENS)
-        
-        # Ensure minimum chunk size of 1 and reasonable maximum
-        chunk_size = max(1, min(chunk_size, 100))
+        # With enhanced pros/cons (up to 5 each), responses are much longer
+        # Reduce chunk size to avoid truncation
+        chunk_size = 10  # Much smaller chunks for enhanced analysis
         
         print(f"Calculated chunk size: {chunk_size} profiles per batch")
         return chunk_size
@@ -264,7 +262,7 @@ Keep the output to 1-2 sentences maximum."""
 - **1-3:** Poor match. Tangentially related but not a good fit.
 - **0:** No match. The profile is completely irrelevant to the query.
 
-For each profile, you must also provide a concise, one-sentence "pro" (key strength) and "con" (key weakness) based on the query.
+For each profile, provide up to 5 reasons "Why this may be a good match" and up to 5 reasons "Why this may not be a good match". Each reason should be a concise sentence directly relevant to the user's search query. Only include reasons that are clearly supported by the profile information. Do not include generic or irrelevant statements.
 """
                 
                 # Prepare the user message with profiles
@@ -277,8 +275,8 @@ Profiles to evaluate:
 Please respond with a JSON array where each object has:
 - "profile_id": The profile identifier (use the "id" field from each profile).
 - "score": An integer from 0 to 10, representing relevance.
-- "pro": A one-sentence explanation of the main strength/match.
-- "con": A one-sentence explanation of the main limitation/concern.
+- "pros": An array of up to 5 detailed strengths/advantages (each as a concise sentence) that are directly relevant to the user query.
+- "cons": An array of up to 5 detailed weaknesses/concerns (each as a concise sentence) that are directly relevant to the user query.
 
 IMPORTANT: For "profile_id", use the exact value from the "id" field of each profile in the JSON above.
 
@@ -286,9 +284,14 @@ Example format:
 [
   {{
     "profile_id": "profile_123",
-    "score": 0.85,
-    "pro": "Strong background in required technology with relevant industry experience.",
-    "con": "Location might not be ideal for the role requirements."
+    "score": 8,
+    "pros": [
+      "Strong background in required technology with 5+ years experience.",
+      "Currently works at a leading company in the target industry."
+    ],
+    "cons": [
+      "Limited experience with specific tools mentioned in requirements."
+    ]
   }}
 ]""".format(user_query, profiles_json)
 
@@ -299,7 +302,7 @@ Example format:
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_message}
                     ],
-                    max_tokens=4000,
+                    max_tokens=8000,  # Increased for enhanced pros/cons
                     temperature=0.3
                 )
                 
@@ -310,12 +313,18 @@ Example format:
                 try:
                     # Clean the response before parsing JSON
                     cleaned_response = self.clean_json_response(ai_response)
+                    
+                    # Check if response is empty or just whitespace
+                    if not cleaned_response.strip():
+                        logger.error(f"Empty response from OpenAI for chunk {i//chunk_size + 1}")
+                        continue
+                    
                     # Try to parse as JSON
                     chunk_results = json.loads(cleaned_response)
                     
                     # Validate and process results
                     for result in chunk_results:
-                        if isinstance(result, dict) and all(key in result for key in ["profile_id", "score", "pro", "con"]):
+                        if isinstance(result, dict) and all(key in result for key in ["profile_id", "score", "pros", "cons"]):
                             # Find the original profile data with improved matching logic
                             result_profile_id = str(result["profile_id"])
                             profile_data = None
@@ -340,11 +349,17 @@ Example format:
                                     break
                             
                             if profile_data:
+                                pros = result.get("pros", [])
+                                cons = result.get("cons", [])
+                                
                                 all_results.append({
                                     "profile": profile_data,
                                     "score": max(0, min(10, int(float(result["score"])))),  # Ensure score is 0-10
-                                    "pro": result["pro"],
-                                    "con": result["con"]
+                                    "pros": pros,
+                                    "cons": cons,
+                                    # Keep backward compatibility
+                                    "pro": pros[0] if pros else "Strong candidate match.",
+                                    "con": cons[0] if cons else "Some limitations may apply."
                                 })
                                 logger.debug(f"Successfully matched profile_id: {result_profile_id}")
                             else:
@@ -393,7 +408,6 @@ Example format:
             # Step 2: Generate embedding for the query
             query_embedding = await embeddings_service.generate_embedding(processed_query)
             
-            # Step 3: Execute hybrid query against Pinecone
             # Step 3: Execute hybrid query against Pinecone
             candidate_profiles = await self.hybrid_pinecone_query(
                 vector=query_embedding,

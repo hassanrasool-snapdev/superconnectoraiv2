@@ -18,6 +18,7 @@ export interface Connection {
   followers?: string | null;
   description?: string | null;
   headline?: string | null;
+  rating?: number | null;
 
   // Connection Information
   connected_on?: string | null;

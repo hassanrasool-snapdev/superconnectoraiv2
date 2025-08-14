@@ -14,6 +14,7 @@ class ConnectionBase(BaseModel):
     followers: Optional[str] = None
     description: Optional[str] = None
     headline: Optional[str] = None
+    rating: Optional[int] = None
     
     # Connection Information
     connected_on: Optional[str] = None

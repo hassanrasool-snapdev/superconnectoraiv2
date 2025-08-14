@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, BackgroundTasks
-from typing import List, Dict
+from typing import List, Dict, Optional
 from uuid import UUID
 import os
 import tempfile
@@ -119,10 +119,11 @@ async def get_connections(
     current_user: dict = Depends(get_current_user),
     db = Depends(get_database),
     page: int = Query(1, ge=1),
-    limit: int = Query(100, ge=1, le=1000)
+    limit: int = Query(100, ge=1, le=1000),
+    min_rating: Optional[int] = Query(None, ge=1, le=10)
 ):
     user_id = UUID(current_user["id"])
-    connections = await connections_service.get_user_connections(db, user_id, page, limit)
+    connections = await connections_service.get_user_connections(db, user_id, page, limit, min_rating)
     return connections
 
 @router.get("/connections/count")

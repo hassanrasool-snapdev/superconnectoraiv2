@@ -3,6 +3,7 @@ import io
 from uuid import UUID
 from fastapi import HTTPException, status, UploadFile
 from app.models.connection import ConnectionInDB
+import random
 
 async def process_and_store_connections(db, file: UploadFile, user_id: UUID):
     # First, delete all existing connections for this user
@@ -55,6 +56,7 @@ async def process_and_store_connections(db, file: UploadFile, user_id: UUID):
             "company_linkedin": None,  # Not available in new CSV
         }
         record['user_id'] = user_id
+        record['rating'] = random.randint(1, 10)
         
         # Create a ConnectionInDB instance to get default values and validate
         new_connection = ConnectionInDB(**record)
@@ -74,9 +76,13 @@ async def process_and_store_connections(db, file: UploadFile, user_id: UUID):
     
     return len(records_to_insert)
 
-async def get_user_connections(db, user_id: UUID, page: int = 1, limit: int = 100):
+async def get_user_connections(db, user_id: UUID, page: int = 1, limit: int = 100, min_rating: int = None):
     skip = (page - 1) * limit
-    cursor = db.connections.find({"user_id": str(user_id)}).skip(skip).limit(limit)
+    query = {"user_id": str(user_id)}
+    if min_rating is not None:
+        query["rating"] = {"$gte": min_rating}
+    
+    cursor = db.connections.find(query).skip(skip).limit(limit)
     connections = await cursor.to_list(length=limit)
     return connections
 

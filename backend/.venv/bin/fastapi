@@ -1,4 +1,6 @@
-#!/Users/hanguyen/superconnector-v2/backend/.venv/bin/python
+#!/bin/sh
+'''exec' "/Users/hasmacbookair/Super Connector AI/Dev/superconnectoraiv2/backend/.venv/bin/python3" "$0" "$@"
+' '''
 # -*- coding: utf-8 -*-
 import re
 import sys

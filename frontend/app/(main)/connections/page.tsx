@@ -6,22 +6,24 @@ import { getConnections, getConnectionsCount } from '../../../src/lib/api';
 import { Connection } from '../../../src/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../src/components/ui/table";
 import { Button } from '../../../src/components/ui/button';
-
+import { Label } from "../../../src/components/ui/label";
+ 
 export default function ConnectionsPage() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState<number | null>(null);
+  const [minRating, setMinRating] = useState<number>(1);
   const { token } = useAuth();
-
+ 
   useEffect(() => {
     if (token) {
       setLoading(true);
       
       // Fetch both connections and total count
       Promise.all([
-        getConnections(token, page),
+        getConnections(token, page, 10, minRating),
         getConnectionsCount(token)
       ])
         .then(([connectionsData, countData]) => {
@@ -31,7 +33,7 @@ export default function ConnectionsPage() {
         .catch(err => setError(err.message))
         .finally(() => setLoading(false));
     }
-  }, [token, page]);
+  }, [token, page, minRating]);
 
   if (loading) return <p>Loading connections...</p>;
   if (error) return <p className="text-red-600">Error: {error}</p>;
@@ -47,6 +49,23 @@ export default function ConnectionsPage() {
             </p>
           )}
         </div>
+        <div className="w-full max-w-xs">
+          <Label htmlFor="min-rating">Minimum Rating: {minRating}</Label>
+          <input
+            id="min-rating"
+            type="range"
+            min={1}
+            max={10}
+            step={1}
+            value={minRating}
+            onChange={(e) => setMinRating(parseInt(e.target.value))}
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+          />
+          <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <span>1</span>
+            <span>10</span>
+          </div>
+        </div>
       </div>
       <div className="overflow-x-auto">
         <Table>
@@ -58,6 +77,7 @@ export default function ConnectionsPage() {
               <TableHead>Company</TableHead>
               <TableHead>Location</TableHead>
               <TableHead>Followers</TableHead>
+              <TableHead>Rating</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -112,7 +132,7 @@ export default function ConnectionsPage() {
                   {[conn.city, conn.state, conn.country].filter(Boolean).join(', ') || 'N/A'}
                 </TableCell>
                 <TableCell className="text-sm">{conn.followers || 'N/A'}</TableCell>
-                <TableCell className="text-sm">{conn.followers || 'N/A'}</TableCell>
+                <TableCell className="text-sm">{conn.rating || 'N/A'}</TableCell>
               </TableRow>
             ))}
           </TableBody>
