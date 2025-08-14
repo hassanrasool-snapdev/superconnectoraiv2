@@ -106,3 +106,10 @@ export interface AuthState {
   login: (token: string, user: User) => void;
   logout: () => void;
 }
+export interface GeneratedEmail {
+  id: string;
+  connection_id: string;
+  reason_for_connecting: string;
+  generated_content: string;
+  created_at: string;
+}

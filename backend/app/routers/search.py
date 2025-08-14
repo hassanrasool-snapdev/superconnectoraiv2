@@ -210,6 +210,80 @@ async def ai_search_connections_stream(
         }
     )
 
+@router.post("/search/progress")
+async def ai_search_connections_progress(
+    search_request: SearchRequest,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    """
+    Perform AI-powered search with progress updates.
+    """
+    if not search_request.query.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Search query cannot be empty"
+        )
+
+    async def progress_generator():
+        # Simulate progress
+        for i in range(5):
+            await asyncio.sleep(0.5)
+            yield f"data: {json.dumps({'progress': (i + 1) * 10})}\n\n"
+
+        # Perform the actual search
+        try:
+            user_id = current_user["id"]
+            
+            filter_dict = None
+            if search_request.filters:
+                filter_dict = convert_search_filters_to_pinecone_filter(search_request.filters)
+            
+            yield f"data: {json.dumps({'progress': 60, 'message': 'Reranking results...'})}\n\n"
+            await asyncio.sleep(1)
+
+            reranked_results = await retrieval_service.retrieve_and_rerank(
+                user_query=search_request.query,
+                user_id=user_id,
+                enable_query_rewrite=True,
+                filter_dict=filter_dict
+            )
+
+            yield f"data: {json.dumps({'progress': 80, 'message': 'Finalizing...'})}\n\n"
+            await asyncio.sleep(1)
+
+            search_results = []
+            for result in reranked_results:
+                pros = result.get("pros", [result.get("pro", "Strong candidate match.")])
+                cons = result.get("cons", [result.get("con", "Some limitations may apply.")])
+                
+                search_results.append(SearchResult(
+                    connection=result["profile"],
+                    score=result["score"],
+                    summary=result.get("pro", pros[0] if pros else "Strong candidate match."),
+                    pros=pros,
+                    cons=cons
+                ).model_dump())
+
+            # Save search to history
+            try:
+                history_entry = SearchHistoryCreate(
+                    query=search_request.query,
+                    filters=search_request.filters.model_dump() if search_request.filters else None,
+                    results_count=len(search_results)
+                )
+                await search_history_service.create_search_history_entry(db, UUID(user_id), history_entry)
+            except Exception as history_error:
+                print(f"Failed to save search history: {history_error}")
+
+            yield f"data: {json.dumps({'progress': 100, 'results': search_results})}\n\n"
+
+        except Exception as e:
+            print(f"Search router error: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(progress_generator(), media_type="text/event-stream")
+
 def convert_search_filters_to_pinecone_filter(filters: SearchFilters) -> dict:
     """Convert SearchFilters to Pinecone metadata filter format"""
     filter_dict = {}

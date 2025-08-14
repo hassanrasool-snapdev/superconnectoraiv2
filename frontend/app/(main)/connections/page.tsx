@@ -14,50 +14,50 @@ export default function ConnectionsPage() {
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState<number | null>(null);
-  const [minRating, setMinRating] = useState<number>(1);
+  const [minRating, setMinRating] = useState<number>(6);
   const { token } = useAuth();
  
-  useEffect(() => {
-    if (token) {
-      setLoading(true);
-      
-      // Fetch both connections and total count
-      Promise.all([
-        getConnections(token, page, 10, minRating),
-        getConnectionsCount(token)
-      ])
-        .then(([connectionsData, countData]) => {
-          setConnections(connectionsData);
-          setTotalCount(countData.count);
-        })
-        .catch(err => setError(err.message))
-        .finally(() => setLoading(false));
-    }
-  }, [token, page, minRating]);
-
-  if (loading) return <p>Loading connections...</p>;
-  if (error) return <p className="text-red-600">Error: {error}</p>;
-
-  return (
-    <div className="container mx-auto p-4">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">My Connections</h1>
-          {totalCount !== null && (
-            <p className="text-gray-600 mt-1">
-              Total connections available for search: <span className="font-semibold text-blue-600">{totalCount.toLocaleString()}</span>
-            </p>
-          )}
-        </div>
-        <div className="w-full max-w-xs">
-          <Label htmlFor="min-rating">Minimum Rating: {minRating}</Label>
-          <input
-            id="min-rating"
-            type="range"
-            min={1}
-            max={10}
-            step={1}
-            value={minRating}
+   useEffect(() => {
+     if (token) {
+       setLoading(true);
+       
+       // Fetch both connections and total count
+       Promise.all([
+         getConnections(token, page, 10, minRating),
+         getConnectionsCount(token)
+       ])
+         .then(([connectionsData, countData]) => {
+           setConnections(connectionsData);
+           setTotalCount(countData.count);
+         })
+         .catch(err => setError(err.message))
+         .finally(() => setLoading(false));
+     }
+   }, [token, page, minRating]);
+ 
+   if (loading) return <p>Loading connections...</p>;
+   if (error) return <p className="text-red-600">Error: {error}</p>;
+ 
+   return (
+     <div className="container mx-auto p-4">
+       <div className="flex items-center justify-between mb-6">
+         <div>
+           <h1 className="text-2xl font-bold">My Connections</h1>
+           {totalCount !== null && (
+             <p className="text-gray-600 mt-1">
+               Total connections available for search: <span className="font-semibold text-blue-600">{totalCount.toLocaleString()}</span>
+             </p>
+           )}
+         </div>
+         <div className="w-full max-w-xs">
+           <Label htmlFor="min-rating">Minimum Rating: {minRating}</Label>
+           <input
+             id="min-rating"
+             type="range"
+             min={6}
+             max={10}
+             step={1}
+             value={minRating}
             onChange={(e) => setMinRating(parseInt(e.target.value))}
             className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
           />

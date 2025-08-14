@@ -425,8 +425,11 @@ Example format:
             # Step 4: Chunk and re-rank candidates using OpenAI
             reranked_results = await self.rerank_with_openai(candidate_profiles, user_query)
             
+            # Step 5: Filter results based on relevance score
+            filtered_results = [result for result in reranked_results if result['score'] >= 6]
+            
             # Step 6: Limit results to top 20
-            final_results = reranked_results[:20]
+            final_results = filtered_results[:20]
             
             logger.info(f"Total final results: {len(final_results)}")
             # Log details of the first 3 profiles for inspection

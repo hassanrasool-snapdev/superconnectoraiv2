@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { searchConnections } from '@/lib/api';
-import { SearchResult } from '@/lib/types';
+import { searchConnectionsWithProgress, getConnectionsCount } from '@/lib/api';
+import { SearchResult, Connection } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import { Badge } from '../../../src/components/ui/badge';
 import { User, Linkedin, Loader2 } from 'lucide-react';
 import Image from 'next/image';
+import { EmailGenerationModal } from '@/components/shared/EmailGenerationModal';
 
 export default function DashboardPage() {
   const { token } = useAuth();
@@ -17,9 +19,21 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
+  const [searchProgress, setSearchProgress] = useState(0);
+  const [connectionsCount, setConnectionsCount] = useState<number | null>(null);
+ 
+   useEffect(() => {
+     if (token) {
+       getConnectionsCount(token)
+         .then(data => setConnectionsCount(data.count))
+         .catch(err => console.error("Failed to fetch connections count:", err));
+     }
+   }, [token]);
+ 
+   const handleSearch = async (e: React.FormEvent) => {
+     e.preventDefault();
     if (!query.trim() || !token) {
       setError('Authentication token is not available. Please log in again.');
       return;
@@ -28,17 +42,24 @@ export default function DashboardPage() {
     setLoading(true);
     setError(null);
     setHasSearched(true);
+    setSearchProgress(0);
+    setResults([]);
 
     try {
-      const searchResults = await searchConnections({ query: query.trim() }, token);
-      console.log('Raw search results from API:', JSON.stringify(searchResults, null, 2));
-      
+      const searchResults = await searchConnectionsWithProgress(
+        { query: query.trim() },
+        token,
+        (progress) => {
+          setSearchProgress(progress);
+        }
+      );
       setResults(searchResults);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
       setResults([]);
     } finally {
       setLoading(false);
+      setSearchProgress(100);
     }
   };
 
@@ -49,6 +70,11 @@ export default function DashboardPage() {
     // Use email if available, otherwise leave To: field blank
     const toField = email ? email : '';
     window.open(`mailto:${toField}?subject=${subject}&body=${body}`, '_blank');
+  };
+
+  const openEmailModal = (connection: Connection) => {
+    setSelectedConnection(connection);
+    setIsModalOpen(true);
   };
 
   return (
@@ -87,6 +113,18 @@ export default function DashboardPage() {
               </Button>
             </form>
           </div>
+          {loading && (
+            <div className="mt-4 text-center">
+              <p className="text-lg text-gray-800 mb-2">
+                Got it! I'm searching Ha's {connectionsCount?.toLocaleString() ?? ''} 1st degree connections (from LinkedIn).
+              </p>
+              <p className="text-sm text-gray-500 mb-4">
+                This search may take a few minutes so hang tight
+              </p>
+              <Progress value={searchProgress} className="w-full" />
+              <p className="text-sm text-center text-gray-500 mt-2">{searchProgress}% complete</p>
+            </div>
+          )}
         </div>
 
         {/* Error Message */}
@@ -99,6 +137,11 @@ export default function DashboardPage() {
         {/* Search Results */}
         {hasSearched && !loading && (
           <div className="space-y-6">
+            {results.length > 0 && (
+              <h2 className="text-xl font-semibold text-gray-800">
+                Found {results.length} relevant profiles
+              </h2>
+            )}
             {results.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-gray-500 text-lg">No connections match your search criteria.</p>
@@ -231,6 +274,12 @@ export default function DashboardPage() {
                     >
                       Send Email
                     </Button>
+                    <Button
+                      onClick={() => openEmailModal(result.connection)}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      Generate Email with AI
+                    </Button>
                     {result.connection.linkedin_url && (
                       <a
                         href={result.connection.linkedin_url}
@@ -254,14 +303,19 @@ export default function DashboardPage() {
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h3 className="text-lg font-semibold mb-3">Getting Started</h3>
             <div className="space-y-2 text-sm text-gray-600">
-              <p>• Use natural language to describe who you&amp;apos;re looking for</p>
-              <p>• Try queries like &amp;quot;VCs who invest in seed stage consumer startups&amp;quot;</p>
+              <p>• Use natural language to describe who you&apos;re looking for</p>
+              <p>• Try queries like &quot;VCs who invest in seed stage consumer startups&quot;</p>
               <p>• The AI will analyze your connections and provide detailed match analysis</p>
-              <p>• Connections with scores 9-10 are marked as &amp;quot;Top Matches&amp;quot;</p>
+              <p>• Connections with scores 9-10 are marked as &quot;Top Matches&quot;</p>
             </div>
           </div>
         )}
       </div>
+      <EmailGenerationModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        connection={selectedConnection}
+      />
     </div>
   );
 }

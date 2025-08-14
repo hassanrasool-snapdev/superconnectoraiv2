@@ -6,7 +6,8 @@ import {
   SavedSearch,
   SearchHistory,
   FavoriteConnection,
-  SearchFilters
+  SearchFilters,
+  GeneratedEmail
 } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -303,4 +304,97 @@ export async function clearPineconeData(token: string): Promise<{ message: strin
         throw new Error(errorData.detail || 'Failed to clear pinecone data');
     }
     return response.json();
+}
+
+export async function generateEmail(connectionId: string, reason: string, token: string): Promise<GeneratedEmail> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/generated-emails`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ connection_id: connectionId, reason_for_connecting: reason, generated_content: "" }),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to generate email');
+    }
+    return response.json();
+}
+
+export async function getGeneratedEmails(token: string): Promise<GeneratedEmail[]> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/generated-emails`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to fetch generated emails');
+    }
+    return response.json();
+}
+
+export async function searchConnectionsWithProgress(
+    searchRequest: SearchRequest,
+    token: string,
+    onProgress: (progress: number) => void
+): Promise<SearchResult[]> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/search/progress`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(searchRequest),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Search failed');
+    }
+
+    if (!response.body) {
+        throw new Error('Response body is null');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    return new Promise<SearchResult[]>((resolve, reject) => {
+        async function processStream() {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    break;
+                }
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.substring(6));
+                            if (data.error) {
+                                reject(new Error(data.error));
+                                return;
+                            }
+                            if (data.progress !== undefined) {
+                                onProgress(data.progress);
+                            }
+                            if (data.results) {
+                                resolve(data.results);
+                                return;
+                            }
+                        } catch (e) {
+                            console.error("Failed to parse stream data:", line, e);
+                        }
+                    }
+                }
+            }
+        }
+        processStream().catch(reject);
+    });
 }
