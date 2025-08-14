@@ -1,18 +1,23 @@
-from pydantic import BaseModel, Field
-from uuid import UUID, uuid4
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
+import uuid
 
 class FavoriteConnectionBase(BaseModel):
-    connection_id: UUID
+    connection_id: str
 
 class FavoriteConnectionCreate(FavoriteConnectionBase):
     pass
 
 class FavoriteConnectionInDB(FavoriteConnectionBase):
-    id: UUID = Field(default_factory=uuid4)
-    user_id: UUID
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
+    user_id: str
+    favorited_at: datetime = Field(default_factory=datetime.utcnow)
 
-class FavoriteConnectionPublic(FavoriteConnectionBase):
-    id: UUID
-    created_at: datetime
+    model_config = ConfigDict(populate_by_name=True)
+
+class FavoriteConnectionPublic(BaseModel):
+    favorite_id: str
+    favorited_at: datetime
+    connection: dict
+
+    model_config = ConfigDict(from_attributes=True)

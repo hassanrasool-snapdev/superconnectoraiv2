@@ -81,10 +81,9 @@ export interface SavedSearch {
   query: string;
   filters?: SearchFilters;
   created_at: string;
-  updated_at: string;
 }
-
-export interface SearchHistory {
+ 
+ export interface SearchHistory {
   id: string;
   query: string;
   filters?: SearchFilters;
@@ -112,4 +111,13 @@ export interface GeneratedEmail {
   reason_for_connecting: string;
   generated_content: string;
   created_at: string;
+}
+
+export interface Tip {
+  id: string;
+  connection_id: string;
+  amount: number;
+  message?: string;
+  created_at: string;
+  transaction_id?: string;
 }

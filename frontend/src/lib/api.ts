@@ -7,10 +7,11 @@ import {
   SearchHistory,
   FavoriteConnection,
   SearchFilters,
-  GeneratedEmail
+  GeneratedEmail,
+  Tip
 } from './types';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+ 
+ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 // This is a placeholder for a more robust API client
 // In a real app, you'd use something like Axios and have better error handling
@@ -397,4 +398,33 @@ export async function searchConnectionsWithProgress(
         }
         processStream().catch(reject);
     });
+}
+
+// Tipping API
+export async function createTip(connectionId: string, amount: number, message: string | undefined, token: string): Promise<Tip> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/tips`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ connection_id: connectionId, amount, message }),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to create tip');
+    }
+    return response.json();
+}
+
+export async function getTippingHistory(token: string): Promise<Tip[]> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/tips`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to fetch tipping history');
+    }
+    return response.json();
 }

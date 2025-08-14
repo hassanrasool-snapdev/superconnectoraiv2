@@ -6,7 +6,7 @@ async def create_search_history_entry(db, user_id: UUID, search_data: SearchHist
     """Create a new search history entry"""
     search_entry = SearchHistoryInDB(
         **search_data.model_dump(),
-        user_id=user_id
+        user_id=str(user_id)
     )
     
     # Convert to dict for MongoDB storage

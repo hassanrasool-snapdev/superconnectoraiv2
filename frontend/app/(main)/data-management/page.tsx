@@ -3,18 +3,16 @@
 import { useState } from 'react';
 import { useAuth } from '../../../src/context/AuthContext';
 import { uploadConnectionsCSV, deleteConnections, clearPineconeData } from '../../../src/lib/api';
-import { Button } from "../../../src/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "../../../src/components/ui/card";
-import { Input } from "../../../src/components/ui/input";
-import { Label } from "../../../src/components/ui/label";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../../../src/components/ui/alert-dialog";
+import { Button } from '../../../src/components/ui/button';
+import { Input } from '../../../src/components/ui/input';
+import { Label } from '../../../src/components/ui/label';
 
 export default function DataManagementPage() {
   const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [isClearing, setIsClearing] = useState(false);
   const { token } = useAuth();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -25,102 +23,86 @@ export default function DataManagementPage() {
 
   const handleUpload = async () => {
     if (!file || !token) return;
-    setLoading(true);
+    setUploading(true);
     setMessage('');
-    setError('');
     try {
-      const result = await uploadConnectionsCSV(file, token);
-      setMessage(result.message);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
+      const response = await uploadConnectionsCSV(file, token);
+      setMessage(response.message);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Upload failed');
     } finally {
-      setLoading(false);
+      setUploading(false);
     }
   };
 
   const handleDelete = async () => {
     if (!token) return;
-    setLoading(true);
+    if (!confirm('Are you sure you want to delete all your connections? This action cannot be undone.')) return;
+    setDeleting(true);
     setMessage('');
-    setError('');
     try {
       await deleteConnections(token);
-      setMessage('Successfully deleted all connections.');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Delete failed');
+      setMessage('All connections deleted successfully.');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Deletion failed');
     } finally {
-      setLoading(false);
+      setDeleting(false);
     }
   };
 
-  const handleClearAndResync = async () => {
+  const handleClearPinecone = async () => {
     if (!token) return;
-    setIsClearing(true);
+    if (!confirm('Are you sure you want to clear your Pinecone data? This will remove all embeddings.')) return;
+    setClearing(true);
     setMessage('');
-    setError('');
     try {
-      await deleteConnections(token);
-      setMessage('Successfully cleared connections. You can now upload your new file.');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Clearing failed');
+      const response = await clearPineconeData(token);
+      setMessage(response.message);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Failed to clear Pinecone data');
     } finally {
-      setIsClearing(false);
+      setClearing(false);
     }
   };
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Data Management</h1>
-      <div className="grid gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Upload Connections</CardTitle>
-            <CardDescription>Upload a CSV file of your LinkedIn connections. This will replace your existing dataset.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-2">
-              <Label htmlFor="csv-file">CSV File</Label>
-              <Input id="csv-file" type="file" accept=".csv" onChange={handleFileChange} />
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button onClick={handleUpload} disabled={!file || loading}>
-              {loading ? 'Uploading...' : 'Upload and Replace'}
+      <h1 className="text-2xl font-bold mb-6">Data Management</h1>
+      
+      <div className="space-y-8">
+        {/* Upload Connections */}
+        <div className="p-6 border rounded-lg">
+          <h2 className="text-xl font-semibold mb-4">Upload Connections</h2>
+          <div className="flex items-center space-x-4">
+            <Label htmlFor="csv-upload" className="cursor-pointer">
+              <Input id="csv-upload" type="file" accept=".csv" onChange={handleFileChange} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+            </Label>
+            <Button onClick={handleUpload} disabled={!file || uploading}>
+              {uploading ? 'Uploading...' : 'Upload CSV'}
             </Button>
-            <Button onClick={handleClearAndResync} disabled={isClearing || loading} variant="destructive" className="ml-4">
-              {isClearing ? 'Clearing...' : 'Clear and Re-sync'}
-            </Button>
-          </CardFooter>
-        </Card>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Delete Dataset</CardTitle>
-            <CardDescription>Permanently delete your entire connections dataset. This action cannot be undone.</CardDescription>
-          </CardHeader>
-          <CardFooter>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" disabled={loading}>Delete All Connections</Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will permanently delete your entire connection dataset. This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete}>Continue</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </CardFooter>
-        </Card>
-        {message && <p className="text-green-600">{message}</p>}
-        {error && <p className="text-red-600">{error}</p>}
+        {/* Delete Connections */}
+        <div className="p-6 border rounded-lg">
+          <h2 className="text-xl font-semibold mb-4">Delete All Connections</h2>
+          <p className="text-gray-600 mb-4">This will permanently delete all your connection data from the database.</p>
+          <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+            {deleting ? 'Deleting...' : 'Delete All Connections'}
+          </Button>
+        </div>
+
+        {/* Clear Pinecone Data */}
+        <div className="p-6 border rounded-lg">
+          <h2 className="text-xl font-semibold mb-4">Clear Pinecone Index</h2>
+          <p className="text-gray-600 mb-4">This will remove all your data from the Pinecone search index. You will need to re-upload your connections to use the search feature.</p>
+          <Button variant="destructive" onClick={handleClearPinecone} disabled={clearing}>
+            {clearing ? 'Clearing...' : 'Clear Pinecone Data'}
+          </Button>
+        </div>
       </div>
+
+      {message && <p className="mt-6 text-center">{message}</p>}
     </div>
   );
 }

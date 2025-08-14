@@ -1,25 +1,27 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, Dict, Any
+from typing import Optional
 from datetime import datetime
 import uuid
 
-class SavedSearchBase(BaseModel):
-    name: str
-    query: str
-    filters: Optional[Dict[str, Any]] = None
+class TipBase(BaseModel):
+    connection_id: str
+    amount: float
+    message: Optional[str] = None
 
-class SavedSearchCreate(SavedSearchBase):
+class TipCreate(TipBase):
     pass
 
-class SavedSearchInDB(SavedSearchBase):
+class TipInDB(TipBase):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
     user_id: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    
+    transaction_id: Optional[str] = None # For Venmo transaction ID
+
     model_config = ConfigDict(populate_by_name=True)
 
-class SavedSearchPublic(SavedSearchBase):
+class TipPublic(TipBase):
     id: str
     created_at: datetime
+    transaction_id: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)

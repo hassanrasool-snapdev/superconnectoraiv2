@@ -2,15 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { searchConnectionsWithProgress, getConnectionsCount } from '@/lib/api';
+import { searchConnectionsWithProgress, getConnectionsCount, createSavedSearch, addFavoriteConnection } from '@/lib/api';
 import { SearchResult, Connection } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '../../../src/components/ui/badge';
-import { User, Linkedin, Loader2 } from 'lucide-react';
+import { User, Linkedin, Loader2, Star } from 'lucide-react';
 import Image from 'next/image';
 import { EmailGenerationModal } from '@/components/shared/EmailGenerationModal';
+import { TippingModal } from '@/components/shared/TippingModal';
 
 export default function DashboardPage() {
   const { token } = useAuth();
@@ -20,9 +21,11 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isTippingModalOpen, setIsTippingModalOpen] = useState(false);
   const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
   const [searchProgress, setSearchProgress] = useState(0);
   const [connectionsCount, setConnectionsCount] = useState<number | null>(null);
+  const [favoritedStatus, setFavoritedStatus] = useState<{[key: string]: boolean}>({});
  
    useEffect(() => {
      if (token) {
@@ -77,8 +80,41 @@ export default function DashboardPage() {
     setIsModalOpen(true);
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
+  const openTippingModal = (connection: Connection) => {
+    setSelectedConnection(connection);
+    setIsTippingModalOpen(true);
+  };
+ 
+   const handleSaveSearch = async () => {
+    if (!query.trim() || !token) {
+      setError('Cannot save an empty search.');
+      return;
+    }
+    const searchName = prompt('Enter a name for this search:');
+    if (searchName && token) {
+      try {
+        await createSavedSearch(searchName, query.trim(), undefined, token);
+        alert('Search saved successfully!');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to save search');
+      }
+    }
+  };
+
+  const handleFavoriteConnection = async (connectionId: string) => {
+    if (token) {
+      try {
+        await addFavoriteConnection(connectionId, token);
+        setFavoritedStatus(prev => ({ ...prev, [connectionId]: true }));
+        alert('Added to favorites!');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to add to favorites');
+      }
+    }
+  };
+ 
+   return (
+     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-6 py-12">
         {/* Header */}
         <div className="text-center mb-12">
@@ -138,9 +174,12 @@ export default function DashboardPage() {
         {hasSearched && !loading && (
           <div className="space-y-6">
             {results.length > 0 && (
-              <h2 className="text-xl font-semibold text-gray-800">
-                Found {results.length} relevant profiles
-              </h2>
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold text-gray-800">
+                  Found {results.length} relevant profiles
+                </h2>
+                <Button onClick={handleSaveSearch} variant="outline">Save Search</Button>
+              </div>
             )}
             {results.length === 0 ? (
               <div className="text-center py-12">
@@ -272,13 +311,7 @@ export default function DashboardPage() {
                       )}
                       className="bg-blue-600 hover:bg-blue-700 text-white"
                     >
-                      Send Email
-                    </Button>
-                    <Button
-                      onClick={() => openEmailModal(result.connection)}
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      Generate Email with AI
+                      Request a Warm Intro
                     </Button>
                     {result.connection.linkedin_url && (
                       <a
@@ -314,6 +347,11 @@ export default function DashboardPage() {
       <EmailGenerationModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        connection={selectedConnection}
+      />
+      <TippingModal
+        isOpen={isTippingModalOpen}
+        onClose={() => setIsTippingModalOpen(false)}
         connection={selectedConnection}
       />
     </div>

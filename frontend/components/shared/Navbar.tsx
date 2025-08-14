@@ -12,6 +12,7 @@ const navLinks = [
   { href: '/search-history', label: 'Search History' },
   { href: '/favorites', label: 'Favorites' },
   { href: '/generated-emails', label: 'Generated Emails' },
+  { href: '/tipping-history', label: 'Tipping History' },
   { href: '/data-management', label: 'Data Management' },
 ];
 
