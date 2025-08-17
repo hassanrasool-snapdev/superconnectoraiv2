@@ -1,0 +1,755 @@
+"use client";
+
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { 
+  X, 
+  Info, 
+  User, 
+  Linkedin, 
+  ChevronDown, 
+  ChevronUp,
+  Check,
+  AlertCircle,
+  Mail
+} from 'lucide-react';
+
+// Mock telemetry logger
+const logTelemetry = (eventName: string, data: object) => {
+  console.log(`[Telemetry] ${eventName}`, data);
+};
+
+interface WarmIntroModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  targetFirstName: string;
+  targetLastName: string;
+  theirCompany: string;
+  linkedinUrl?: string;
+  profilePicture?: string;
+}
+
+const QUICK_CHIPS = [
+  { label: "Career advice", text: "I'm exploring career opportunities in " },
+  { label: "Role fit", text: "I'm interested in learning about roles at " },
+  { label: "Partnership", text: "I'm exploring potential partnerships with " },
+  { label: "Customer discovery", text: "I'm conducting customer discovery for " }
+];
+
+const EXAMPLE_TEMPLATE = {
+  reason: "I am exploring pilots for an AI-powered customer support tool for retail. I would value your perspective on rollout pitfalls.",
+  about: "I led CS Ops at Sam's Club and recently shipped a triage workflow with 18 percent faster resolution. If helpful, I can share a brief teardown of your public help center and offer to guest share our findings with your team."
+};
+
+const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
+  isOpen,
+  onClose,
+  targetFirstName,
+  targetLastName,
+  theirCompany,
+  linkedinUrl,
+  profilePicture,
+}) => {
+  const { toast } = useToast();
+  const [showExample, setShowExample] = useState(false);
+  const [requesterName, setRequesterName] = useState('');
+  const [requesterLinkedIn, setRequesterLinkedIn] = useState('');
+  const [reason, setReason] = useState('');
+  const [about, setAbout] = useState('');
+  const [includeEmail, setIncludeEmail] = useState(false);
+  const [email, setEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [touched, setTouched] = useState<{[key: string]: boolean}>({});
+
+  // Validation
+  const validateName = (name: string) => {
+    if (name.length < 2) return "Please enter at least 2 characters.";
+    if (name.length > 100) return "Name must be less than 100 characters.";
+    if (!/^[a-zA-Z\s\-']+$/.test(name)) return "Name can only contain letters, spaces, hyphens, and apostrophes.";
+    return "";
+  };
+
+  const validateLinkedIn = (url: string) => {
+    const pattern = /^https?:\/\/(www\.)?linkedin\.com\/in\/[A-Za-z0-9\-_%]+\/?$/;
+    if (!pattern.test(url)) return "Please enter a valid LinkedIn profile URL.";
+    return "";
+  };
+
+  const validateTextarea = (text: string, fieldName: string) => {
+    if (text.length < 20) return `Please add a bit more detail so this request is clear.`;
+    if (text.length > 500) return `${fieldName} must be less than 500 characters.`;
+    return "";
+  };
+
+  const validateEmail = (email: string) => {
+    if (includeEmail && email.length === 0) return "Email is required when including email option is selected.";
+    if (email.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Please enter a valid email address.";
+    return "";
+  };
+
+  // Real-time validation
+  useEffect(() => {
+    const newErrors: {[key: string]: string} = {};
+    
+    if (touched.requesterName) newErrors.requesterName = validateName(requesterName);
+    if (touched.requesterLinkedIn) newErrors.requesterLinkedIn = validateLinkedIn(requesterLinkedIn);
+    if (touched.reason) newErrors.reason = validateTextarea(reason, "Reason");
+    if (touched.about) newErrors.about = validateTextarea(about, "About");
+    if (touched.email) newErrors.email = validateEmail(email);
+
+    setErrors(newErrors);
+  }, [requesterName, requesterLinkedIn, reason, about, email, includeEmail, touched]);
+
+  const isFormValid = 
+    requesterName.length >= 2 && 
+    validateLinkedIn(requesterLinkedIn) === "" &&
+    reason.length >= 20 && 
+    about.length >= 20 &&
+    (!includeEmail || (email.length > 0 && validateEmail(email) === ""));
+
+  // Autosave functionality
+  const saveToLocalStorage = useCallback(() => {
+    const draft = {
+      requesterName,
+      requesterLinkedIn,
+      reason,
+      about,
+      includeEmail,
+      email,
+      targetName: `${targetFirstName} ${targetLastName}`,
+      timestamp: Date.now()
+    };
+    localStorage.setItem('warmIntroModal_draft', JSON.stringify(draft));
+  }, [requesterName, requesterLinkedIn, reason, about, includeEmail, email, targetFirstName, targetLastName]);
+
+  // Debounced autosave
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (requesterName || requesterLinkedIn || reason || about || email) {
+        saveToLocalStorage();
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [saveToLocalStorage]);
+
+  // Load draft on open
+  useEffect(() => {
+    if (isOpen) {
+      logTelemetry('warm_intro_modal_opened', {});
+      
+      const savedDraft = localStorage.getItem('warmIntroModal_draft');
+      if (savedDraft) {
+        try {
+          const draft = JSON.parse(savedDraft);
+          const isRecent = Date.now() - draft.timestamp < 24 * 60 * 60 * 1000; // 24 hours
+          
+          if (isRecent && draft.targetName === `${targetFirstName} ${targetLastName}`) {
+            setRequesterName(draft.requesterName || '');
+            setRequesterLinkedIn(draft.requesterLinkedIn || '');
+            setReason(draft.reason || '');
+            setAbout(draft.about || '');
+            setIncludeEmail(draft.includeEmail || false);
+            setEmail(draft.email || '');
+            
+            logTelemetry('autosave_restored', {});
+          }
+        } catch (e) {
+          console.error('Failed to restore draft:', e);
+        }
+      }
+    }
+  }, [isOpen, targetFirstName, targetLastName]);
+
+  const handleClose = () => {
+    const hasUnsavedChanges = requesterName || requesterLinkedIn || reason || about || email;
+    
+    if (hasUnsavedChanges) {
+      if (confirm('You have unsaved changes. Are you sure you want to close?')) {
+        onClose();
+        resetForm();
+      }
+    } else {
+      onClose();
+      resetForm();
+    }
+  };
+
+  const resetForm = () => {
+    setRequesterName('');
+    setRequesterLinkedIn('');
+    setReason('');
+    setAbout('');
+    setIncludeEmail(false);
+    setEmail('');
+    setShowSuccess(false);
+    setErrors({});
+    setTouched({});
+    localStorage.removeItem('warmIntroModal_draft');
+  };
+
+  const handleBlur = (field: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
+
+  const handleChipClick = (chip: typeof QUICK_CHIPS[0]) => {
+    setReason(prev => prev + chip.text);
+    logTelemetry('chips_used', { chip_label: chip.label });
+  };
+
+  const handleUseTemplate = () => {
+    const confirmOverwrite = reason || about ? 
+      confirm('This will replace your current text. Continue?') : true;
+    
+    if (confirmOverwrite) {
+      setReason(EXAMPLE_TEMPLATE.reason);
+      setAbout(EXAMPLE_TEMPLATE.about);
+      logTelemetry('example_applied', {});
+    }
+  };
+
+  const toggleExample = () => {
+    setShowExample(!showExample);
+    if (!showExample) {
+      logTelemetry('example_opened', {});
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!isFormValid) {
+      // Focus first invalid field
+      const firstError = Object.keys(errors)[0];
+      if (firstError) {
+        document.getElementById(firstError)?.focus();
+        document.getElementById(firstError)?.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    logTelemetry('submit_clicked', {
+      field_lengths: {
+        requesterName: requesterName.length,
+        reason: reason.length,
+        about: about.length
+      },
+      validation_state: 'valid',
+      include_email: includeEmail
+    });
+
+    try {
+      // Create the email content
+      const subject = encodeURIComponent(`Intro to ${targetFirstName} ${targetLastName}`);
+      
+      const targetInfo = `${targetFirstName} ${targetLastName}`;
+      const targetLinkedInLine = linkedinUrl ? `LinkedIn: ${linkedinUrl}` : '';
+      const requesterLinkedInLine = requesterLinkedIn ? `LinkedIn: ${requesterLinkedIn}` : '';
+      const emailLine = includeEmail && email ? `Email: ${email}` : '';
+      
+      const emailBody = `Hi Ha,
+
+Thank you for offering to make an introduction to ${targetInfo}.
+${targetLinkedInLine}
+
+${reason}
+
+${about}
+
+Thanks again for helping connect us — I truly appreciate it.
+
+Regards,
+${requesterName}
+${requesterLinkedInLine}
+${emailLine}`;
+
+      const encodedBody = encodeURIComponent(emailBody);
+      const mailtoUrl = `mailto:ha@nextstepfwd.com?subject=${subject}&body=${encodedBody}`;
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Try multiple methods to open email client
+      let emailOpened = false;
+      
+      // Method 1: Try creating a temporary link and clicking it (most reliable)
+      try {
+        const tempLink = document.createElement('a');
+        tempLink.href = mailtoUrl;
+        tempLink.style.display = 'none';
+        document.body.appendChild(tempLink);
+        tempLink.click();
+        document.body.removeChild(tempLink);
+        emailOpened = true;
+        logTelemetry('email_opened_link_click', {});
+      } catch (e) {
+        console.warn('Link click method failed:', e);
+      }
+      
+      // Method 2: Fallback to window.location if link click failed
+      if (!emailOpened) {
+        try {
+          window.location.href = mailtoUrl;
+          emailOpened = true;
+          logTelemetry('email_opened_location_href', {});
+        } catch (e) {
+          console.warn('Location href method failed:', e);
+        }
+      }
+      
+      // Method 3: Final fallback to window.open
+      if (!emailOpened) {
+        try {
+          const emailWindow = window.open(mailtoUrl, '_blank');
+          if (emailWindow) {
+            emailOpened = true;
+            logTelemetry('email_opened_window_open', {});
+          }
+        } catch (e) {
+          console.warn('Window open method failed:', e);
+        }
+      }
+
+      if (emailOpened) {
+        logTelemetry('submit_success', {});
+        
+        // Show success toast and close modal
+        toast({
+          title: "Email client opened!",
+          description: `Your email client should now be open with the warm intro request for ${targetFirstName}. If it didn't open, please check your browser's popup settings or default email client configuration.`,
+          duration: 6000,
+        });
+        
+        // Close modal and reset form
+        onClose();
+        resetForm();
+      } else {
+        // If all methods failed, show fallback options
+        logTelemetry('email_open_failed', {});
+        
+        // Copy email content to clipboard as fallback
+        try {
+          const fullEmailContent = `To: ha@nextstepfwd.com
+Subject: ${decodeURIComponent(subject)}
+
+${emailBody}`;
+          
+          await navigator.clipboard.writeText(fullEmailContent);
+          
+          toast({
+            title: "Email content copied!",
+            description: "We couldn't open your email client automatically, but we've copied the email content to your clipboard. Please paste it into your email client manually.",
+            duration: 8000,
+          });
+          
+          logTelemetry('email_copied_to_clipboard', {});
+        } catch (clipboardError) {
+          // If clipboard also fails, show the email content in a modal or alert
+          const emailContent = `To: ha@nextstepfwd.com\nSubject: ${decodeURIComponent(subject)}\n\n${emailBody}`;
+          
+          // Show alert with email content
+          alert(`Please copy this email content and send it manually:\n\n${emailContent}`);
+          
+          toast({
+            title: "Manual email required",
+            description: "Please copy the email content from the alert and send it manually to ha@nextstepfwd.com",
+            duration: 8000,
+          });
+          
+          logTelemetry('email_manual_copy_required', {});
+        }
+        
+        // Still close modal and reset form
+        onClose();
+        resetForm();
+      }
+      
+    } catch (error) {
+      logTelemetry('submit_error', { error_code: 'email_failed', error: error });
+      toast({
+        title: "Error",
+        description: "We encountered an error processing your request. Please try again or contact support.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        handleClose();
+      }
+      
+      if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+        if (isFormValid && document.activeElement?.tagName !== 'TEXTAREA') {
+          handleSubmit();
+        }
+      }
+    };
+
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, isFormValid, handleSubmit]);
+
+  if (showSuccess) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-[640px] p-8">
+          <div className="text-center space-y-6">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+              <Check className="w-8 h-8 text-green-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Request sent</h2>
+              <p className="text-gray-600">We will reach out to {targetFirstName} {targetLastName} and follow up with you.</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button onClick={() => { onClose(); resetForm(); }} className="px-6">
+                Close
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={() => { setShowSuccess(false); resetForm(); }}
+                className="text-sm"
+              >
+                Make another intro request
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto p-6 sm:p-8">
+        {/* Header */}
+        <DialogHeader className="space-y-4 pb-6">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-xl font-semibold text-gray-900">
+              Request a Warm Intro
+            </DialogTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClose}
+              className="h-8 w-8 p-0"
+              title="Cancel"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          {/* Byline */}
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+              {profilePicture ? (
+                <img src={profilePicture} alt={targetFirstName} className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-4 h-4 text-gray-500" />
+              )}
+            </div>
+            <p className="text-sm text-gray-600">
+              Ha will reach out to <span className="font-medium text-gray-900">{targetFirstName} {targetLastName}</span> to see if they are open to connecting.
+            </p>
+          </div>
+          
+          <p className="text-sm text-gray-600">Clear reasons increase your chance of a Yes.</p>
+        </DialogHeader>
+
+        {/* Info Banner */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start space-x-3">
+            <Info className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-gray-700">
+              What you write here will be shared with {targetFirstName}.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-8">
+          {/* Example Section */}
+          <div className="space-y-4">
+            <Button
+              variant="ghost"
+              onClick={toggleExample}
+              className="h-auto p-0 text-sm font-medium text-gray-700 hover:text-gray-900"
+            >
+              <span>See an example</span>
+              {showExample ? (
+                <ChevronUp className="w-4 h-4 ml-2" />
+              ) : (
+                <ChevronDown className="w-4 h-4 ml-2" />
+              )}
+            </Button>
+            
+            {showExample && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 space-y-4">
+                <div className="space-y-3">
+                  <h4 className="font-medium text-gray-900">Example request:</h4>
+                  <div className="space-y-3 text-sm text-gray-700">
+                    <p><strong>Why connect:</strong> {EXAMPLE_TEMPLATE.reason}</p>
+                    <p><strong>About you:</strong> {EXAMPLE_TEMPLATE.about}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleUseTemplate}
+                  className="text-xs"
+                >
+                  Use this template
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Your Information Section */}
+          <div className="space-y-6">
+            <div className="border-b border-gray-200 pb-2">
+              <h3 className="text-base font-medium text-gray-900">Your Information</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="requesterName" className="text-sm font-medium text-gray-900">
+                  Your Full Name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="requesterName"
+                  placeholder="Enter your full name"
+                  value={requesterName}
+                  onChange={(e) => setRequesterName(e.target.value)}
+                  onBlur={() => handleBlur('requesterName')}
+                  maxLength={100}
+                  className={cn(
+                    "text-sm",
+                    errors.requesterName && touched.requesterName && "border-red-500 focus:border-red-500"
+                  )}
+                  aria-describedby="requesterName-error requesterName-counter"
+                />
+                <div className="flex justify-between items-center min-h-[20px]">
+                  <p id="requesterName-error" className="text-xs text-red-600" aria-live="polite">
+                    {errors.requesterName && touched.requesterName && errors.requesterName}
+                  </p>
+                  <p id="requesterName-counter" className={cn(
+                    "text-xs",
+                    requesterName.length > 90 ? "text-amber-600" : "text-gray-500"
+                  )}>
+                    {requesterName.length}/100
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="requesterLinkedIn" className="text-sm font-medium text-gray-900">
+                  Your LinkedIn Profile URL <span className="text-red-500">*</span>
+                </Label>
+                <div className="relative">
+                  <Linkedin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    id="requesterLinkedIn"
+                    placeholder="https://linkedin.com/in/yourprofile"
+                    value={requesterLinkedIn}
+                    onChange={(e) => setRequesterLinkedIn(e.target.value)}
+                    onBlur={() => handleBlur('requesterLinkedIn')}
+                    className={cn(
+                      "text-sm pl-10",
+                      errors.requesterLinkedIn && touched.requesterLinkedIn && "border-red-500 focus:border-red-500"
+                    )}
+                    aria-describedby="requesterLinkedIn-error"
+                  />
+                </div>
+                <p id="requesterLinkedIn-error" className="text-xs text-red-600 min-h-[16px]" aria-live="polite">
+                  {errors.requesterLinkedIn && touched.requesterLinkedIn && errors.requesterLinkedIn}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Your Request Section */}
+          <div className="space-y-6">
+            <div className="border-b border-gray-200 pb-2">
+              <h3 className="text-base font-medium text-gray-900">Your Request</h3>
+            </div>
+            
+            {/* Quick Chips */}
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600">Quick starters:</p>
+              <div className="flex flex-wrap gap-2">
+                {QUICK_CHIPS.map((chip) => (
+                  <Button
+                    key={chip.label}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleChipClick(chip)}
+                    className="text-xs h-7 px-3"
+                  >
+                    {chip.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="reason" className="text-sm font-medium text-gray-900">
+                Why do you want to connect with {targetFirstName}? <span className="text-red-500">*</span>
+              </Label>
+              <p className="text-xs text-gray-600">
+                Specific beats generic. Mention a project, interest, or shared context.
+              </p>
+              <div className="relative">
+                <Textarea
+                  id="reason"
+                  placeholder="Share the context, goal, or topic you'd like to discuss..."
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  onBlur={() => handleBlur('reason')}
+                  maxLength={500}
+                  className={cn(
+                    "min-h-[120px] text-sm resize-none",
+                    errors.reason && touched.reason && "border-red-500 focus:border-red-500"
+                  )}
+                  aria-describedby="reason-error reason-counter"
+                />
+              </div>
+              <div className="flex justify-between items-center min-h-[20px]">
+                <p id="reason-error" className="text-xs text-red-600" aria-live="polite">
+                  {errors.reason && touched.reason && errors.reason}
+                </p>
+                <p id="reason-counter" className={cn(
+                  "text-xs",
+                  reason.length > 480 ? "text-red-600" : reason.length > 450 ? "text-amber-600" : "text-gray-500"
+                )}>
+                  {reason.length}/500
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* About You Section */}
+          <div className="space-y-6">
+            <div className="border-b border-gray-200 pb-2">
+              <h3 className="text-base font-medium text-gray-900">About You</h3>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="about" className="text-sm font-medium text-gray-900">
+                Tell {targetFirstName} a bit about yourself and why a connection could be valuable. <span className="text-red-500">*</span>
+              </Label>
+              <p className="text-xs text-gray-600">
+                Your role, relevant work, and how this connection could help both of you.
+              </p>
+              <div className="relative">
+                <Textarea
+                  id="about"
+                  placeholder="Your role, relevant work, and how a connection could be valuable for them..."
+                  value={about}
+                  onChange={(e) => setAbout(e.target.value)}
+                  onBlur={() => handleBlur('about')}
+                  maxLength={500}
+                  className={cn(
+                    "min-h-[120px] text-sm resize-none",
+                    errors.about && touched.about && "border-red-500 focus:border-red-500"
+                  )}
+                  aria-describedby="about-error about-counter"
+                />
+              </div>
+              <div className="flex justify-between items-center min-h-[20px]">
+                <p id="about-error" className="text-xs text-red-600" aria-live="polite">
+                  {errors.about && touched.about && errors.about}
+                </p>
+                <p id="about-counter" className={cn(
+                  "text-xs",
+                  about.length > 480 ? "text-red-600" : about.length > 450 ? "text-amber-600" : "text-gray-500"
+                )}>
+                  {about.length}/500
+                </p>
+              </div>
+            </div>
+
+            {/* Email Toggle */}
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="includeEmail"
+                  checked={includeEmail}
+                  onChange={(e) => setIncludeEmail(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <Label htmlFor="includeEmail" className="text-sm text-gray-700">
+                  Include my email with the intro
+                </Label>
+              </div>
+              
+              {includeEmail && (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="your.email@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      onBlur={() => handleBlur('email')}
+                      className={cn(
+                        "text-sm pl-10",
+                        errors.email && touched.email && "border-red-500 focus:border-red-500"
+                      )}
+                      aria-describedby="email-error"
+                    />
+                  </div>
+                  <p id="email-error" className="text-xs text-red-600 min-h-[16px]" aria-live="polite">
+                    {errors.email && touched.email && errors.email}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="pt-6 border-t border-gray-200 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3 justify-end">
+            <Button variant="ghost" onClick={handleClose} className="sm:order-1">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmit} 
+              disabled={!isFormValid || isSubmitting}
+              className="sm:order-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-30"
+            >
+              {isSubmitting ? 'Sending...' : 'Send Request'}
+            </Button>
+          </div>
+          <p className="text-xs text-gray-500 text-center">
+            We will not share your contact info without your consent.
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default WarmIntroModal;

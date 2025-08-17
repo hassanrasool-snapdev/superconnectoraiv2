@@ -13,6 +13,7 @@ import Image from 'next/image';
 import { EmailGenerationModal } from '@/components/shared/EmailGenerationModal';
 import { TippingModal } from '@/components/shared/TippingModal';
 import { TippingBanner } from '@/components/shared/TippingBanner';
+import WarmIntroModal from '@/components/shared/WarmIntroModal';
 
 export default function DashboardPage() {
   const { token } = useAuth();
@@ -23,6 +24,7 @@ export default function DashboardPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTippingModalOpen, setIsTippingModalOpen] = useState(false);
+  const [isWarmIntroModalOpen, setIsWarmIntroModalOpen] = useState(false);
   const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
   const [searchProgress, setSearchProgress] = useState(0);
   const [connectionsCount, setConnectionsCount] = useState<number | null>(null);
@@ -71,13 +73,9 @@ export default function DashboardPage() {
     }
   };
 
-  const handleEmailConnection = (email: string | null | undefined, name: string) => {
-    const subject = encodeURIComponent(`Connection from LinkedIn`);
-    const body = encodeURIComponent(`Hi ${name},\n\nI hope this message finds you well. I wanted to reach out to connect and explore potential opportunities for collaboration.\n\nBest regards`);
-    
-    // Use email if available, otherwise leave To: field blank
-    const toField = email ? email : '';
-    window.open(`mailto:${toField}?subject=${subject}&body=${body}`, '_blank');
+  const openWarmIntroModal = (connection: Connection) => {
+    setSelectedConnection(connection);
+    setIsWarmIntroModalOpen(true);
   };
 
   const openEmailModal = (connection: Connection) => {
@@ -91,9 +89,6 @@ export default function DashboardPage() {
   };
 
   const handleSupportClick = () => {
-    // Since the banner is generic, we can't tie it to a specific connection.
-    // We can either open the modal without a connection, or find the first top match.
-    // For now, let's find the first top match and open the modal for them.
     const topMatch = results.find(result => result.score >= 9)?.connection;
     if (topMatch) {
       openTippingModal(topMatch);
@@ -321,10 +316,7 @@ export default function DashboardPage() {
                   {/* Action Buttons */}
                   <div className="flex items-center space-x-4 mt-6">
                     <Button
-                      onClick={() => handleEmailConnection(
-                        result.connection.email_address,
-                        `${result.connection.first_name} ${result.connection.last_name}`
-                      )}
+                      onClick={() => openWarmIntroModal(result.connection)}
                       className="bg-blue-600 hover:bg-blue-700 text-white"
                     >
                       Request a Warm Intro
@@ -355,10 +347,10 @@ export default function DashboardPage() {
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h3 className="text-lg font-semibold mb-3">Getting Started</h3>
             <div className="space-y-2 text-sm text-gray-600">
-              <p>• Use natural language to describe who you&apos;re looking for</p>
-              <p>• Try queries like &quot;VCs who invest in seed stage consumer startups&quot;</p>
+              <p>• Use natural language to describe who you're looking for</p>
+              <p>• Try queries like "VCs who invest in seed stage consumer startups"</p>
               <p>• The AI will analyze your connections and provide detailed match analysis</p>
-              <p>• Connections with scores 9-10 are marked as &quot;Top Matches&quot;</p>
+              <p>• Connections with scores 9-10 are marked as "Top Matches"</p>
             </div>
           </div>
         )}
@@ -373,6 +365,17 @@ export default function DashboardPage() {
         onClose={() => setIsTippingModalOpen(false)}
         connection={selectedConnection}
       />
+      {selectedConnection && (
+        <WarmIntroModal
+          isOpen={isWarmIntroModalOpen}
+          onClose={() => setIsWarmIntroModalOpen(false)}
+          targetFirstName={selectedConnection.first_name}
+          targetLastName={selectedConnection.last_name}
+          theirCompany={selectedConnection.company_name || ''}
+          linkedinUrl={selectedConnection.linkedin_url || undefined}
+          profilePicture={selectedConnection.profile_picture || undefined}
+        />
+      )}
     </div>
   );
 }
