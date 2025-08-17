@@ -12,7 +12,7 @@ const navLinks = [
   { href: '/search-history', label: 'Search History' },
   { href: '/favorites', label: 'Favorites' },
   { href: '/generated-emails', label: 'Generated Emails' },
-  { href: '/tipping-history', label: 'Tipping History' },
+  { href: '/tipping-history', label: 'Contribution History' },
   { href: '/data-management', label: 'Data Management' },
 ];
 
@@ -26,7 +26,7 @@ export function Navbar() {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-8">
             <Link href="/dashboard" className="font-bold text-xl">
-              AI Superconnector
+              Superconnect AI
             </Link>
             <div className="hidden md:flex items-center space-x-4">
               {navLinks.map((link) => (

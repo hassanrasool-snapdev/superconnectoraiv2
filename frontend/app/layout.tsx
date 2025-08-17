@@ -6,7 +6,7 @@ import { AuthProvider } from "../src/context/AuthContext";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "AI Superconnector",
+  title: "Superconnect AI",
   description: "Intelligently search your professional network.",
 };
 

@@ -12,6 +12,7 @@ import { User, Linkedin, Loader2, Star } from 'lucide-react';
 import Image from 'next/image';
 import { EmailGenerationModal } from '@/components/shared/EmailGenerationModal';
 import { TippingModal } from '@/components/shared/TippingModal';
+import { TippingBanner } from '@/components/shared/TippingBanner';
 
 export default function DashboardPage() {
   const { token } = useAuth();
@@ -26,6 +27,7 @@ export default function DashboardPage() {
   const [searchProgress, setSearchProgress] = useState(0);
   const [connectionsCount, setConnectionsCount] = useState<number | null>(null);
   const [favoritedStatus, setFavoritedStatus] = useState<{[key: string]: boolean}>({});
+  const [showTippingBanner, setShowTippingBanner] = useState(false);
  
    useEffect(() => {
      if (token) {
@@ -57,6 +59,9 @@ export default function DashboardPage() {
         }
       );
       setResults(searchResults);
+      if (searchResults.some(result => result.score >= 9)) {
+        setShowTippingBanner(true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
       setResults([]);
@@ -83,6 +88,16 @@ export default function DashboardPage() {
   const openTippingModal = (connection: Connection) => {
     setSelectedConnection(connection);
     setIsTippingModalOpen(true);
+  };
+
+  const handleSupportClick = () => {
+    // Since the banner is generic, we can't tie it to a specific connection.
+    // We can either open the modal without a connection, or find the first top match.
+    // For now, let's find the first top match and open the modal for them.
+    const topMatch = results.find(result => result.score >= 9)?.connection;
+    if (topMatch) {
+      openTippingModal(topMatch);
+    }
   };
  
    const handleSaveSearch = async () => {
@@ -118,7 +133,7 @@ export default function DashboardPage() {
       <div className="max-w-4xl mx-auto px-6 py-12">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-6">SuperConnector AI</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-6">Superconnect AI</h1>
           
           {/* Search Section */}
           <div className="bg-white rounded-lg shadow-sm border p-8 mb-8">
@@ -181,6 +196,7 @@ export default function DashboardPage() {
                 <Button onClick={handleSaveSearch} variant="outline">Save Search</Button>
               </div>
             )}
+
             {results.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-gray-500 text-lg">No connections match your search criteria.</p>
@@ -327,6 +343,9 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ))
+            )}
+            {showTippingBanner && (
+              <TippingBanner onSupportClick={handleSupportClick} />
             )}
           </div>
         )}
