@@ -67,7 +67,7 @@ export default function DataManagementPage() {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6">Data Management</h1>
+      <h1 className="text-2xl font-bold mb-6">Upload Connections</h1>
       
       <div className="space-y-8">
         {/* Upload Connections */}

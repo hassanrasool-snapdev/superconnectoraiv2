@@ -6,14 +6,8 @@ import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 
 const navLinks = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/connections', label: 'My Connections' },
-  { href: '/saved-searches', label: 'Saved Searches' },
-  { href: '/search-history', label: 'Search History' },
-  { href: '/favorites', label: 'Favorites' },
-  { href: '/generated-emails', label: 'Generated Emails' },
-  { href: '/tipping-history', label: 'Contribution History' },
-  { href: '/data-management', label: 'Data Management' },
+  { href: '/dashboard', label: 'Search Connections' },
+  { href: '/data-management', label: 'Upload Connections' },
 ];
 
 export function Navbar() {
