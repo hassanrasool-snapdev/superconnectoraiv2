@@ -8,6 +8,7 @@ import { usePathname } from 'next/navigation';
 const navLinks = [
   { href: '/dashboard', label: 'Search Connections' },
   { href: '/data-management', label: 'Upload Connections' },
+  { href: '/warm-intro-requests', label: 'Warm Intro Requests' },
 ];
 
 export function Navbar() {

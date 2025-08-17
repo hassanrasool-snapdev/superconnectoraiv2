@@ -121,3 +121,32 @@ export interface Tip {
   created_at: string;
   transaction_id?: string;
 }
+
+export enum WarmIntroStatus {
+    pending = "pending",
+    connected = "connected",
+    declined = "declined",
+}
+
+export interface WarmIntroRequest {
+  id: string;
+  requester_name: string;
+  connection_name: string;
+  requester_first_name?: string | null;
+  requester_last_name?: string | null;
+  connection_first_name?: string | null;
+  connection_last_name?: string | null;
+  status: WarmIntroStatus;
+  created_at: string;
+  updated_at: string;
+  connected_date?: string | null;
+  declined_date?: string | null;
+}
+
+export interface PaginatedWarmIntroRequests {
+  items: WarmIntroRequest[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+}

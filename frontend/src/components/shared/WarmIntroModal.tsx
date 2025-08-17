@@ -13,22 +13,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  X, 
-  Info, 
-  User, 
-  Linkedin, 
-  ChevronDown, 
+import { createWarmIntroRequest } from '@/lib/api';
+import { WarmIntroStatus } from '@/lib/types';
+import { useAuth } from '@/context/AuthContext';
+import {
+  X,
+  Info,
+  User,
+  Linkedin,
+  ChevronDown,
   ChevronUp,
   Check,
   AlertCircle,
   Mail
 } from 'lucide-react';
 
-// Mock telemetry logger
-const logTelemetry = (eventName: string, data: object) => {
-  console.log(`[Telemetry] ${eventName}`, data);
-};
+import { telemetry } from '@/lib/telemetry';
 
 interface WarmIntroModalProps {
   isOpen: boolean;
@@ -62,6 +62,7 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
   profilePicture,
 }) => {
   const { toast } = useToast();
+  const { token } = useAuth();
   const [showExample, setShowExample] = useState(false);
   const [requesterName, setRequesterName] = useState('');
   const [requesterLinkedIn, setRequesterLinkedIn] = useState('');
@@ -73,6 +74,7 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
   const [showSuccess, setShowSuccess] = useState(false);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [touched, setTouched] = useState<{[key: string]: boolean}>({});
+  const [modalOpenTime, setModalOpenTime] = useState<number>(0);
 
   // Validation
   const validateName = (name: string) => {
@@ -149,7 +151,15 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
   // Load draft on open
   useEffect(() => {
     if (isOpen) {
-      logTelemetry('warm_intro_modal_opened', {});
+      const openTime = Date.now();
+      setModalOpenTime(openTime);
+      
+      telemetry.track('modal_opened', {
+        target_name: `${targetFirstName} ${targetLastName}`,
+        target_company: theirCompany,
+        has_linkedin_url: !!linkedinUrl,
+        has_profile_picture: !!profilePicture,
+      });
       
       const savedDraft = localStorage.getItem('warmIntroModal_draft');
       if (savedDraft) {
@@ -165,24 +175,48 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
             setIncludeEmail(draft.includeEmail || false);
             setEmail(draft.email || '');
             
-            logTelemetry('autosave_restored', {});
+            const ageHours = Math.round((Date.now() - draft.timestamp) / (1000 * 60 * 60));
+            telemetry.track('autosave_restored', {
+              fields_restored: Object.keys(draft).filter(key =>
+                key !== 'timestamp' && key !== 'targetName' && draft[key]
+              ),
+              age_hours: ageHours,
+            });
           }
         } catch (e) {
           console.error('Failed to restore draft:', e);
         }
       }
     }
-  }, [isOpen, targetFirstName, targetLastName]);
+  }, [isOpen, targetFirstName, targetLastName, theirCompany, linkedinUrl, profilePicture]);
 
   const handleClose = () => {
     const hasUnsavedChanges = requesterName || requesterLinkedIn || reason || about || email;
     
     if (hasUnsavedChanges) {
       if (confirm('You have unsaved changes. Are you sure you want to close?')) {
+        telemetry.track('modal_closed', {
+          target_name: `${targetFirstName} ${targetLastName}`,
+          form_completion_percentage: telemetry.calculateFormCompletion({
+            requesterName,
+            requesterLinkedIn,
+            reason,
+            about,
+            email: includeEmail ? email : 'not_required',
+          }),
+          time_spent_seconds: telemetry.calculateTimeSpent(modalOpenTime),
+          close_method: 'unsaved_warning',
+        });
         onClose();
         resetForm();
       }
     } else {
+      telemetry.track('modal_closed', {
+        target_name: `${targetFirstName} ${targetLastName}`,
+        form_completion_percentage: 0,
+        time_spent_seconds: telemetry.calculateTimeSpent(modalOpenTime),
+        close_method: 'button',
+      });
       onClose();
       resetForm();
     }
@@ -206,25 +240,37 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
   };
 
   const handleChipClick = (chip: typeof QUICK_CHIPS[0]) => {
+    const existingLength = reason.length;
     setReason(prev => prev + chip.text);
-    logTelemetry('chips_used', { chip_label: chip.label });
+    telemetry.track('quick_chip_used', {
+      chip_label: chip.label,
+      chip_text: chip.text,
+      existing_text_length: existingLength,
+    });
   };
 
   const handleUseTemplate = () => {
-    const confirmOverwrite = reason || about ? 
+    const confirmOverwrite = reason || about ?
       confirm('This will replace your current text. Continue?') : true;
     
     if (confirmOverwrite) {
+      telemetry.track('example_template_applied', {
+        target_name: `${targetFirstName} ${targetLastName}`,
+        overwrite_existing: !!(reason || about),
+        existing_reason_length: reason.length,
+        existing_about_length: about.length,
+      });
       setReason(EXAMPLE_TEMPLATE.reason);
       setAbout(EXAMPLE_TEMPLATE.about);
-      logTelemetry('example_applied', {});
     }
   };
 
   const toggleExample = () => {
     setShowExample(!showExample);
     if (!showExample) {
-      logTelemetry('example_opened', {});
+      telemetry.track('example_template_viewed', {
+        target_name: `${targetFirstName} ${targetLastName}`,
+      });
     }
   };
 
@@ -241,14 +287,12 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
 
     setIsSubmitting(true);
     
-    logTelemetry('submit_clicked', {
-      field_lengths: {
-        requesterName: requesterName.length,
-        reason: reason.length,
-        about: about.length
-      },
-      validation_state: 'valid',
-      include_email: includeEmail
+    telemetry.track('email_generation_started', {
+      requester_name_length: requesterName.length,
+      reason_length: reason.length,
+      about_length: about.length,
+      include_email: includeEmail,
+      target_name: `${targetFirstName} ${targetLastName}`,
     });
 
     try {
@@ -294,7 +338,10 @@ ${emailLine}`;
         tempLink.click();
         document.body.removeChild(tempLink);
         emailOpened = true;
-        logTelemetry('email_opened_link_click', {});
+        telemetry.track('email_client_opened', {
+          method: 'link_click',
+          email_length: emailBody.length,
+        });
       } catch (e) {
         console.warn('Link click method failed:', e);
       }
@@ -304,7 +351,10 @@ ${emailLine}`;
         try {
           window.location.href = mailtoUrl;
           emailOpened = true;
-          logTelemetry('email_opened_location_href', {});
+          telemetry.track('email_client_opened', {
+            method: 'location_href',
+            email_length: emailBody.length,
+          });
         } catch (e) {
           console.warn('Location href method failed:', e);
         }
@@ -316,7 +366,10 @@ ${emailLine}`;
           const emailWindow = window.open(mailtoUrl, '_blank');
           if (emailWindow) {
             emailOpened = true;
-            logTelemetry('email_opened_window_open', {});
+            telemetry.track('email_client_opened', {
+              method: 'window_open',
+              email_length: emailBody.length,
+            });
           }
         } catch (e) {
           console.warn('Window open method failed:', e);
@@ -324,7 +377,36 @@ ${emailLine}`;
       }
 
       if (emailOpened) {
-        logTelemetry('submit_success', {});
+        // Create WarmIntroRequest record in database
+        try {
+          await createWarmIntroRequest(
+            requesterName,
+            `${targetFirstName} ${targetLastName}`,
+            WarmIntroStatus.pending,
+            token!
+          );
+          telemetry.track('warm_intro_request_created', {
+            requester_name: requesterName,
+            connection_name: `${targetFirstName} ${targetLastName}`,
+            creation_method: 'success',
+          });
+        } catch (dbError) {
+          // Log the error but don't fail the entire flow since email was sent successfully
+          console.error('Failed to create WarmIntroRequest record:', dbError);
+          telemetry.track('warm_intro_request_creation_failed', {
+            error_type: typeof dbError === 'object' && dbError ? dbError.constructor.name : 'unknown',
+            requester_name: requesterName,
+            connection_name: `${targetFirstName} ${targetLastName}`,
+          });
+          
+          // Show a non-blocking warning toast
+          toast({
+            title: "Request logged with warning",
+            description: "Your email was sent successfully, but we couldn't save the request to our database. The intro request is still valid.",
+            variant: "default",
+            duration: 4000,
+          });
+        }
         
         // Show success toast and close modal
         toast({
@@ -338,7 +420,28 @@ ${emailLine}`;
         resetForm();
       } else {
         // If all methods failed, show fallback options
-        logTelemetry('email_open_failed', {});
+        // Create WarmIntroRequest record in database even for fallback case
+        try {
+          await createWarmIntroRequest(
+            requesterName,
+            `${targetFirstName} ${targetLastName}`,
+            WarmIntroStatus.pending,
+            token!
+          );
+          telemetry.track('warm_intro_request_created', {
+            requester_name: requesterName,
+            connection_name: `${targetFirstName} ${targetLastName}`,
+            creation_method: 'fallback',
+          });
+        } catch (dbError) {
+          // Log the error but don't fail the entire flow
+          console.error('Failed to create WarmIntroRequest record (fallback):', dbError);
+          telemetry.track('warm_intro_request_creation_failed', {
+            error_type: typeof dbError === 'object' && dbError ? dbError.constructor.name : 'unknown',
+            requester_name: requesterName,
+            connection_name: `${targetFirstName} ${targetLastName}`,
+          });
+        }
         
         // Copy email content to clipboard as fallback
         try {
@@ -355,7 +458,10 @@ ${emailBody}`;
             duration: 8000,
           });
           
-          logTelemetry('email_copied_to_clipboard', {});
+          telemetry.track('email_fallback_used', {
+            fallback_method: 'clipboard',
+            email_length: fullEmailContent.length,
+          });
         } catch (clipboardError) {
           // If clipboard also fails, show the email content in a modal or alert
           const emailContent = `To: ha@nextstepfwd.com\nSubject: ${decodeURIComponent(subject)}\n\n${emailBody}`;
@@ -369,7 +475,10 @@ ${emailBody}`;
             duration: 8000,
           });
           
-          logTelemetry('email_manual_copy_required', {});
+          telemetry.track('email_fallback_used', {
+            fallback_method: 'manual_alert',
+            email_length: emailContent.length,
+          });
         }
         
         // Still close modal and reset form
@@ -378,7 +487,11 @@ ${emailBody}`;
       }
       
     } catch (error) {
-      logTelemetry('submit_error', { error_code: 'email_failed', error: error });
+      telemetry.trackCustom('submit_error', {
+        error_code: 'email_failed',
+        error_type: typeof error === 'object' && error ? error.constructor.name : 'unknown',
+        target_name: `${targetFirstName} ${targetLastName}`,
+      });
       toast({
         title: "Error",
         description: "We encountered an error processing your request. Please try again or contact support.",

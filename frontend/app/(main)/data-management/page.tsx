@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useAuth } from '../../../src/context/AuthContext';
-import { uploadConnectionsCSV, deleteConnections, clearPineconeData } from '../../../src/lib/api';
 import { Button } from '../../../src/components/ui/button';
 import { Input } from '../../../src/components/ui/input';
 import { Label } from '../../../src/components/ui/label';
+import { uploadConnectionsCSV, deleteConnections, clearPineconeData } from '../../../src/lib/api';
 
 export default function DataManagementPage() {
   const [file, setFile] = useState<File | null>(null);
