@@ -32,7 +32,7 @@ export function EmailGenerationModal({ isOpen, onClose, connection }: EmailGener
     setIsLoading(true);
     try {
       const email = await generateEmail(connection.id, reason, token);
-      setGeneratedEmail(email.generated_content);
+      setGeneratedEmail(email.body);
     } catch (error) {
       console.error('Failed to generate email', error);
     } finally {

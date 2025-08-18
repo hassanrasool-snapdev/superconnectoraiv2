@@ -21,7 +21,7 @@ export default function RegisterPage() {
     setError(null);
     setLoading(true);
     try {
-      await registerUser(email, password);
+      await registerUser(email, password, email); // Using email as name for now
       router.push('/login'); // Redirect to login page after successful registration
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.');

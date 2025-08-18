@@ -10,7 +10,7 @@ interface TippingModalProps {
   connection: Connection | null;
 }
 
-export function TippingModal({ isOpen, onClose, connection }: TippingModalProps) {
+export function TippingModal({ isOpen, onClose }: TippingModalProps) {
   if (!isOpen) return null;
 
   return (

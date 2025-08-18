@@ -24,7 +24,6 @@ import {
   ChevronDown,
   ChevronUp,
   Check,
-  AlertCircle,
   Mail
 } from 'lucide-react';
 
@@ -113,7 +112,7 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
     if (touched.email) newErrors.email = validateEmail(email);
 
     setErrors(newErrors);
-  }, [requesterName, requesterLinkedIn, reason, about, email, includeEmail, touched]);
+  }, [requesterName, requesterLinkedIn, reason, about, email, includeEmail, touched, validateEmail]);
 
   const isFormValid = 
     requesterName.length >= 2 && 
@@ -146,7 +145,7 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [saveToLocalStorage]);
+  }, [requesterName, requesterLinkedIn, reason, about, email, saveToLocalStorage]);
 
   // Load draft on open
   useEffect(() => {
@@ -462,7 +461,7 @@ ${emailBody}`;
             fallback_method: 'clipboard',
             email_length: fullEmailContent.length,
           });
-        } catch (clipboardError) {
+        } catch {
           // If clipboard also fails, show the email content in a modal or alert
           const emailContent = `To: ha@nextstepfwd.com\nSubject: ${decodeURIComponent(subject)}\n\n${emailBody}`;
           
@@ -520,7 +519,7 @@ ${emailBody}`;
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
     }
-  }, [isOpen, isFormValid, handleSubmit]);
+  }, [isOpen, isFormValid, handleClose, handleSubmit]);
 
   if (showSuccess) {
     return (

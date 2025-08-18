@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { searchConnectionsWithProgress, getConnectionsCount, createSavedSearch, addFavoriteConnection } from '@/lib/api';
+import { searchConnectionsWithProgress, getConnectionsCount, createSavedSearch } from '@/lib/api';
 import { SearchResult, Connection } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '../../../src/components/ui/badge';
-import { User, Linkedin, Loader2, Star } from 'lucide-react';
+import { User, Linkedin, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { EmailGenerationModal } from '@/components/shared/EmailGenerationModal';
 import { TippingModal } from '@/components/shared/TippingModal';
@@ -28,7 +28,6 @@ export default function DashboardPage() {
   const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
   const [searchProgress, setSearchProgress] = useState(0);
   const [connectionsCount, setConnectionsCount] = useState<number | null>(null);
-  const [favoritedStatus, setFavoritedStatus] = useState<{[key: string]: boolean}>({});
   const [showTippingBanner, setShowTippingBanner] = useState(false);
  
    useEffect(() => {
@@ -78,10 +77,6 @@ export default function DashboardPage() {
     setIsWarmIntroModalOpen(true);
   };
 
-  const openEmailModal = (connection: Connection) => {
-    setSelectedConnection(connection);
-    setIsModalOpen(true);
-  };
 
   const openTippingModal = (connection: Connection) => {
     setSelectedConnection(connection);
@@ -103,7 +98,7 @@ export default function DashboardPage() {
     const searchName = prompt('Enter a name for this search:');
     if (searchName && token) {
       try {
-        await createSavedSearch(searchName, query.trim(), undefined, token);
+        await createSavedSearch(searchName, query.trim(), {}, token);
         alert('Search saved successfully!');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to save search');
@@ -111,17 +106,6 @@ export default function DashboardPage() {
     }
   };
 
-  const handleFavoriteConnection = async (connectionId: string) => {
-    if (token) {
-      try {
-        await addFavoriteConnection(connectionId, token);
-        setFavoritedStatus(prev => ({ ...prev, [connectionId]: true }));
-        alert('Added to favorites!');
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to add to favorites');
-      }
-    }
-  };
  
    return (
      <div className="min-h-screen bg-gray-50">
@@ -162,7 +146,7 @@ export default function DashboardPage() {
           {loading && (
             <div className="mt-4 text-center">
               <p className="text-lg text-gray-800 mb-2">
-                Got it! I'm searching Ha's {connectionsCount?.toLocaleString() ?? ''} 1st degree connections (from LinkedIn).
+                Got it! I&apos;m searching Ha&apos;s {connectionsCount?.toLocaleString() ?? ''} 1st degree connections (from LinkedIn).
               </p>
               <p className="text-sm text-gray-500 mb-4">
                 This search may take a few minutes so hang tight
@@ -347,10 +331,10 @@ export default function DashboardPage() {
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h3 className="text-lg font-semibold mb-3">Getting Started</h3>
             <div className="space-y-2 text-sm text-gray-600">
-              <p>• Use natural language to describe who you're looking for</p>
-              <p>• Try queries like "VCs who invest in seed stage consumer startups"</p>
+              <p>• Use natural language to describe who you&apos;re looking for</p>
+              <p>• Try queries like &ldquo;VCs who invest in seed stage consumer startups&rdquo;</p>
               <p>• The AI will analyze your connections and provide detailed match analysis</p>
-              <p>• Connections with scores 9-10 are marked as "Top Matches"</p>
+              <p>• Connections with scores 9-10 are marked as &ldquo;Top Matches&rdquo;</p>
             </div>
           </div>
         )}

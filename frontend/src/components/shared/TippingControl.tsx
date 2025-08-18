@@ -22,7 +22,7 @@ export const TippingControl: React.FC<TippingControlProps> = ({
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+    const userAgent = navigator.userAgent || navigator.vendor || (window as Window & typeof globalThis & { opera?: string }).opera || '';
     setIsMobile(/android|iphone|ipad|ipod/i.test(userAgent));
   }, []);
 

@@ -10,7 +10,7 @@ export interface TelemetryEvent {
   session_id?: string;
   page_url?: string;
   user_agent?: string;
-  properties: Record<string, any>;
+  properties: Record<string, unknown>;
 }
 
 export interface WarmIntroAnalytics {
@@ -223,13 +223,13 @@ class TelemetryService {
     const event: TelemetryEvent = {
       ...this.createBaseEvent(),
       event_name: eventName as string,
-      properties: properties as Record<string, any>,
+      properties: properties as Record<string, unknown>,
     };
     
     this.sendEvent(event);
   }
   
-  trackCustom(eventName: string, properties: Record<string, any>): void {
+  trackCustom(eventName: string, properties: Record<string, unknown>): void {
     const event: TelemetryEvent = {
       ...this.createBaseEvent(),
       event_name: eventName,

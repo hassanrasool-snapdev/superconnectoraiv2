@@ -16,7 +16,7 @@ export default function TippingHistoryPage() {
     if (token) {
       setLoading(true);
       getTippingHistory(token)
-        .then(setContributionHistory)
+        .then(data => setContributionHistory(data.items as Tip[]))
         .catch(err => setError(err.message))
         .finally(() => setLoading(false));
     }

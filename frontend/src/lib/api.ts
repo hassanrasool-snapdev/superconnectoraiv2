@@ -1,4 +1,14 @@
-import { WarmIntroStatus } from "./types";
+import {
+  WarmIntroStatus,
+  WarmIntroRequest,
+  PaginatedWarmIntroRequests,
+  GeneratedEmail,
+  SearchResult,
+  SavedSearch,
+  FavoriteConnection,
+  Connection,
+  SearchHistory
+} from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
 
@@ -7,7 +17,7 @@ export async function createWarmIntroRequest(
   connectionName: string,
   status: WarmIntroStatus = WarmIntroStatus.pending,
   token: string
-): Promise<any> {
+): Promise<WarmIntroRequest> {
   try {
     const response = await fetch(`${API_BASE_URL}/warm-intro-requests/`, {
       method: "POST",
@@ -39,9 +49,9 @@ export async function updateWarmIntroRequestStatus(
     token: string,
     connectedDate?: string,
     declinedDate?: string
-): Promise<any> {
+): Promise<WarmIntroRequest> {
     try {
-        const body: any = { status };
+        const body: { status: WarmIntroStatus; connected_date?: string; declined_date?: string } = { status };
         
         if (connectedDate) {
             body.connected_date = connectedDate;
@@ -76,7 +86,7 @@ export async function getWarmIntroRequests(
   page: number = 1,
   limit: number = 10,
   status?: WarmIntroStatus
-): Promise<any> {
+): Promise<PaginatedWarmIntroRequests> {
   try {
     const params = new URLSearchParams({
       page: page.toString(),
@@ -109,7 +119,7 @@ export async function getWarmIntroRequests(
 export async function getWarmIntroRequestById(
   requestId: string,
   token: string
-): Promise<any> {
+): Promise<WarmIntroRequest> {
   try {
     const response = await fetch(`${API_BASE_URL}/warm-intro-requests/${requestId}`, {
       method: "GET",
@@ -130,7 +140,7 @@ export async function getWarmIntroRequestById(
   }
 }
 
-async function uploadConnectionsCSV(file: File): Promise<any> {
+async function uploadConnectionsCSV(file: File): Promise<{ message: string; uploaded_count: number }> {
   try {
     const formData = new FormData();
     formData.append("file", file);
@@ -151,7 +161,7 @@ async function uploadConnectionsCSV(file: File): Promise<any> {
   }
 }
 
-async function deleteConnections(token: string): Promise<any> {
+async function deleteConnections(token: string): Promise<{ message: string; deleted_count: number }> {
   try {
     const response = await fetch(`/api/delete`, {
       method: "POST",
@@ -173,7 +183,7 @@ async function deleteConnections(token: string): Promise<any> {
   }
 }
 
-async function clearPineconeData(token: string): Promise<any> {
+async function clearPineconeData(token: string): Promise<{ message: string }> {
   try {
     const response = await fetch(`/api/clear-pinecone`, {
       method: "POST",
@@ -194,7 +204,7 @@ async function clearPineconeData(token: string): Promise<any> {
 }
 
 // Real authentication implementations
-export async function loginUser(email: string, password: string): Promise<any> {
+export async function loginUser(email: string, password: string): Promise<{ access_token: string; token_type: string }> {
   try {
     const formData = new FormData();
     formData.append('username', email);
@@ -220,7 +230,7 @@ export async function registerUser(
   email: string,
   password: string,
   name: string
-): Promise<any> {
+): Promise<{ id: string; email: string; name: string; created_at: string }> {
   try {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: "POST",
@@ -246,21 +256,14 @@ export async function registerUser(
 }
 
 export async function getGeneratedEmails(
-  token: string,
-  page: number = 1,
-  limit: number = 10
-): Promise<any> {
+  token: string
+): Promise<GeneratedEmail[]> {
   // Mock implementation - replace with actual API call when backend is ready
-  return Promise.resolve({
-    items: [],
-    total: 0,
-    page,
-    limit,
-    total_pages: 0
-  });
+  console.log(token); // Prevent unused parameter error
+  return Promise.resolve([]);
 }
 
-export async function getUserProfile(token: string): Promise<any> {
+export async function getUserProfile(token: string): Promise<{ id: string; email: string; name: string; created_at: string }> {
   try {
     const response = await fetch(`${API_BASE_URL}/users/me`, {
       method: "GET",
@@ -282,10 +285,10 @@ export async function getUserProfile(token: string): Promise<any> {
 }
 
 export async function searchConnectionsWithProgress(
-  searchRequest: { query: string; filters?: any },
+  searchRequest: { query: string; filters?: Record<string, unknown> },
   token: string,
   onProgress?: (progress: number) => void
-): Promise<any[]> {
+): Promise<SearchResult[]> {
   try {
     if (onProgress) {
       onProgress(10);
@@ -307,7 +310,7 @@ export async function searchConnectionsWithProgress(
     // Handle Server-Sent Events for progress updates
     const reader = response.body?.getReader();
     const decoder = new TextDecoder();
-    let results: any[] = [];
+    let results: SearchResult[] = [];
 
     if (reader) {
       while (true) {
@@ -320,7 +323,7 @@ export async function searchConnectionsWithProgress(
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
-              const data = JSON.parse(line.slice(6));
+              const data = JSON.parse(line.slice(6)) as { progress?: number; results?: SearchResult[]; error?: string };
               
               if (data.progress && onProgress) {
                 onProgress(data.progress);
@@ -372,9 +375,9 @@ export async function getConnectionsCount(token: string): Promise<{ count: numbe
 export async function createSavedSearch(
   name: string,
   query: string,
-  filters: any,
+  filters: Record<string, unknown> | undefined,
   token: string
-): Promise<any> {
+): Promise<SavedSearch> {
   try {
     const response = await fetch(`${API_BASE_URL}/saved-searches/`, {
       method: "POST",
@@ -403,7 +406,7 @@ export async function createSavedSearch(
 export async function addFavoriteConnection(
   connectionId: string,
   token: string
-): Promise<any> {
+): Promise<FavoriteConnection> {
   try {
     const response = await fetch(`${API_BASE_URL}/favorites/`, {
       method: "POST",
@@ -431,8 +434,9 @@ export async function generateEmail(
   connectionId: string,
   prompt: string,
   token: string
-): Promise<any> {
+): Promise<{ subject: string; body: string; generated_at: string }> {
   // Mock implementation - replace with actual API call when backend is ready
+  console.log(connectionId, prompt, token); // Prevent unused parameter errors
   return Promise.resolve({
     subject: "Introduction Request",
     body: "This is a generated email body based on your prompt.",
@@ -445,7 +449,7 @@ export async function getConnections(
   token: string,
   page: number = 1,
   limit: number = 10
-): Promise<any> {
+): Promise<{ items: Connection[]; total: number; page: number; limit: number; total_pages: number }> {
   // Mock implementation - replace with actual API call when backend is ready
   return Promise.resolve({
     items: [],
@@ -457,75 +461,56 @@ export async function getConnections(
 }
 
 export async function getSavedSearches(
-  token: string,
-  page: number = 1,
-  limit: number = 10
-): Promise<any> {
+  token: string
+): Promise<SavedSearch[]> {
   // Mock implementation - replace with actual API call when backend is ready
-  return Promise.resolve({
-    items: [],
-    total: 0,
-    page,
-    limit,
-    total_pages: 0
-  });
+  console.log(token); // Prevent unused parameter error
+  return Promise.resolve([]);
 }
 
 export async function deleteSavedSearch(
   searchId: string,
   token: string
-): Promise<any> {
+): Promise<{ success: boolean }> {
   // Mock implementation - replace with actual API call when backend is ready
+  console.log(searchId, token); // Prevent unused parameter errors
   return Promise.resolve({ success: true });
 }
 
 export async function getSearchHistory(
-  token: string,
-  page: number = 1,
-  limit: number = 10
-): Promise<any> {
+  token: string
+): Promise<SearchHistory[]> {
   // Mock implementation - replace with actual API call when backend is ready
-  return Promise.resolve({
-    items: [],
-    total: 0,
-    page,
-    limit,
-    total_pages: 0
-  });
+  console.log(token); // Prevent unused parameter error
+  return Promise.resolve([]);
 }
 
-export async function clearSearchHistory(token: string): Promise<any> {
+export async function clearSearchHistory(token: string): Promise<{ success: boolean }> {
   // Mock implementation - replace with actual API call when backend is ready
+  console.log(token); // Prevent unused parameter error
   return Promise.resolve({ success: true });
 }
 
 export async function deleteSearchHistoryEntry(
   entryId: string,
   token: string
-): Promise<any> {
+): Promise<{ success: boolean }> {
   // Mock implementation - replace with actual API call when backend is ready
+  console.log(entryId, token); // Prevent unused parameter errors
   return Promise.resolve({ success: true });
 }
 
 export async function getFavoriteConnections(
-  token: string,
-  page: number = 1,
-  limit: number = 10
-): Promise<any> {
+  token: string
+): Promise<FavoriteConnection[]> {
   // Mock implementation - replace with actual API call when backend is ready
-  return Promise.resolve({
-    items: [],
-    total: 0,
-    page,
-    limit,
-    total_pages: 0
-  });
+  console.log(token); // Prevent unused parameter error
+  return Promise.resolve([]);
 }
 
 export async function removeFavoriteConnection(
   connectionId: string,
-  token: string
-): Promise<any> {
+): Promise<{ id: string; favorited: boolean }> {
   // Mock implementation - replace with actual API call when backend is ready
   return Promise.resolve({
     id: connectionId,
@@ -537,7 +522,7 @@ export async function getTippingHistory(
   token: string,
   page: number = 1,
   limit: number = 10
-): Promise<any> {
+): Promise<{ items: unknown[]; total: number; page: number; limit: number; total_pages: number }> {
   // Mock implementation - replace with actual API call when backend is ready
   return Promise.resolve({
     items: [],

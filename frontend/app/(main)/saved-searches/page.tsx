@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../../src/context/AuthContext';
 import { getSavedSearches, deleteSavedSearch } from '../../../src/lib/api';
 import { SavedSearch } from '../../../src/lib/types';
@@ -15,7 +15,7 @@ export default function SavedSearchesPage() {
   const { token } = useAuth();
   const router = useRouter();
 
-  const fetchSavedSearches = () => {
+  const fetchSavedSearches = useCallback(() => {
     if (token) {
       setLoading(true);
       getSavedSearches(token)
@@ -23,11 +23,11 @@ export default function SavedSearchesPage() {
         .catch(err => setError(err.message))
         .finally(() => setLoading(false));
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchSavedSearches();
-  }, [token]);
+  }, [fetchSavedSearches]);
 
   const handleRunSearch = (search: SavedSearch) => {
     const params = new URLSearchParams();

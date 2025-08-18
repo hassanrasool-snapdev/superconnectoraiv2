@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { getWarmIntroRequests, updateWarmIntroRequestStatus, exportConnectedRequestsCSV } from '@/lib/api';
@@ -74,7 +74,7 @@ export default function WarmIntroRequestsPage() {
     router.push(`/warm-intro-requests${newURL}`);
   };
 
-  const fetchRequests = async (page: number = currentPage, status: 'all' | WarmIntroStatus = statusFilter) => {
+  const fetchRequests = useCallback(async (page: number = currentPage, status: 'all' | WarmIntroStatus = statusFilter) => {
     if (!token) return;
     
     const startTime = Date.now();
@@ -111,8 +111,8 @@ export default function WarmIntroRequestsPage() {
         status_filter: status,
       });
       
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
       
       // Track API error
       telemetry.track('api_request_performance', {
@@ -131,11 +131,11 @@ export default function WarmIntroRequestsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, statusFilter, token, toast]);
 
   useEffect(() => {
     fetchRequests(currentPage, statusFilter);
-  }, [token, currentPage, statusFilter]);
+  }, [fetchRequests, currentPage, statusFilter]);
 
   // Track initial page load performance
   useEffect(() => {
@@ -197,7 +197,7 @@ export default function WarmIntroRequestsPage() {
         title: "Status updated",
         description: `Request status changed to ${newStatus}`,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Track failed status update
       telemetry.track('status_update_failed', {
         request_id: requestId,
@@ -291,7 +291,7 @@ export default function WarmIntroRequestsPage() {
         title: "Export successful",
         description: "Connected requests have been exported to CSV",
       });
-    } catch (err: any) {
+    } catch {
       toast({
         title: "Export failed",
         description: "Failed to export connected requests",

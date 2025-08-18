@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../../src/context/AuthContext';
 import { getSearchHistory, clearSearchHistory, deleteSearchHistoryEntry } from '../../../src/lib/api';
 import { SearchHistory } from '../../../src/lib/types';
@@ -15,7 +15,7 @@ export default function SearchHistoryPage() {
   const { token } = useAuth();
   const router = useRouter();
 
-  const fetchSearchHistory = () => {
+  const fetchSearchHistory = useCallback(() => {
     if (token) {
       setLoading(true);
       getSearchHistory(token)
@@ -23,11 +23,11 @@ export default function SearchHistoryPage() {
         .catch(err => setError(err.message))
         .finally(() => setLoading(false));
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchSearchHistory();
-  }, [token]);
+  }, [fetchSearchHistory]);
 
   const handleRunSearch = (search: SearchHistory) => {
     const params = new URLSearchParams();

@@ -1,21 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../../src/context/AuthContext';
 import { getFavoriteConnections, removeFavoriteConnection } from '../../../src/lib/api';
 import { FavoriteConnection } from '../../../src/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../src/components/ui/table";
 import { Button } from '../../../src/components/ui/button';
-import { useRouter } from 'next/navigation';
 
 export default function FavoritesPage() {
   const [favorites, setFavorites] = useState<FavoriteConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { token } = useAuth();
-  const router = useRouter();
 
-  const fetchFavorites = () => {
+  const fetchFavorites = useCallback(() => {
     if (token) {
       setLoading(true);
       getFavoriteConnections(token)
@@ -23,16 +21,16 @@ export default function FavoritesPage() {
         .catch(err => setError(err.message))
         .finally(() => setLoading(false));
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchFavorites();
-  }, [token]);
+  }, [fetchFavorites]);
 
   const handleRemoveFavorite = async (connectionId: string) => {
     if (token) {
       try {
-        await removeFavoriteConnection(connectionId, token);
+        await removeFavoriteConnection(connectionId);
         fetchFavorites(); // Refresh the list
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to remove favorite');

@@ -18,7 +18,7 @@ export default function GeneratedEmailsPage() {
       setLoading(true);
       getGeneratedEmails(token)
         .then(setEmails)
-        .catch((err: any) => setError(err.message))
+        .catch((err: Error) => setError(err.message))
         .finally(() => setLoading(false));
     }
   }, [token]);

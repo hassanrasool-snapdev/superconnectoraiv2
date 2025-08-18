@@ -42,12 +42,12 @@ export default function AnalyticsDashboard() {
     // Calculate average form completion
     const modalCloseEvents = allEvents.filter(e => e.event_name === 'modal_closed');
     const avgFormCompletion = modalCloseEvents.length > 0 
-      ? modalCloseEvents.reduce((sum, e) => sum + (e.properties.form_completion_percentage || 0), 0) / modalCloseEvents.length
+      ? modalCloseEvents.reduce((sum, e) => sum + (typeof e.properties.form_completion_percentage === 'number' ? e.properties.form_completion_percentage : 0), 0) / modalCloseEvents.length
       : 0;
     
     // Calculate average time spent
     const avgTimeSpent = modalCloseEvents.length > 0
-      ? modalCloseEvents.reduce((sum, e) => sum + (e.properties.time_spent_seconds || 0), 0) / modalCloseEvents.length
+      ? modalCloseEvents.reduce((sum, e) => sum + (typeof e.properties.time_spent_seconds === 'number' ? e.properties.time_spent_seconds : 0), 0) / modalCloseEvents.length
       : 0;
     
     // Get top events

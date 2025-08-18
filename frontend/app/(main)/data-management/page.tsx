@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../../../src/context/AuthContext';
 import { Button } from '../../../src/components/ui/button';
 import { Input } from '../../../src/components/ui/input';
@@ -26,7 +26,7 @@ export default function DataManagementPage() {
     setUploading(true);
     setMessage('');
     try {
-      const response = await uploadConnectionsCSV(file, token);
+      const response = await uploadConnectionsCSV(file);
       setMessage(response.message);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Upload failed');

@@ -24,11 +24,11 @@ export default function ConnectionsPage() {
       setLoading(true);
       
       Promise.all([
-        getConnections(token, page, 10, minRating),
+        getConnections(token, page, 10),
         getConnectionsCount(token)
       ])
         .then(([connectionsData, countData]) => {
-          setConnections(connectionsData);
+          setConnections(connectionsData.items);
           setTotalCount(countData.count);
         })
         .catch(err => setError(err.message))
