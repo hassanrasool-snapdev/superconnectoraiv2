@@ -36,7 +36,7 @@ app.include_router(saved_searches.router, prefix="/api/v1", tags=["Saved Searche
 app.include_router(search_history.router, prefix="/api/v1", tags=["Search History"])
 app.include_router(favorites.router, prefix="/api/v1", tags=["Favorites"])
 app.include_router(embeddings.router, prefix="/api/v1/embeddings", tags=["Embeddings"])
-app.include_router(pinecone_index.router, tags=["Pinecone Index"])
+app.include_router(pinecone_index.router, prefix="/api/v1", tags=["Pinecone Index"])
 app.include_router(retrieval.router, prefix="/api/v1", tags=["Retrieval"])
 app.include_router(generated_emails.router, prefix="/api/v1", tags=["generated-emails"])
 app.include_router(tips.router, prefix="/api/v1", tags=["Tipping"])
