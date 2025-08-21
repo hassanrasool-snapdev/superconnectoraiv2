@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.db import connect_to_mongo, close_mongo_connection
-from app.routers import auth, connections, search, saved_searches, search_history, favorites, embeddings, pinecone_index, retrieval, generated_emails, tips, warm_intro_requests
+from app.routers import auth, connections, search, saved_searches, search_history, favorites, embeddings, pinecone_index, retrieval, generated_emails, tips, warm_intro_requests, health
 
 # Get the logger used by Uvicorn
 uvicorn_error_logger = logging.getLogger("uvicorn.error")
@@ -41,7 +41,4 @@ app.include_router(retrieval.router, prefix="/api/v1", tags=["Retrieval"])
 app.include_router(generated_emails.router, prefix="/api/v1", tags=["generated-emails"])
 app.include_router(tips.router, prefix="/api/v1", tags=["Tipping"])
 app.include_router(warm_intro_requests.router, prefix="/api/v1", tags=["Warm Intro Requests"])
-
-@app.get("/api/v1/health")
-def health_check():
-    return {"status": "ok"}
+app.include_router(health.router, prefix="/api/v1", tags=["Health"])
