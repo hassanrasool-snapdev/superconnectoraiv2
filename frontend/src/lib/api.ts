@@ -294,56 +294,142 @@ export async function searchConnectionsWithProgress(
       onProgress(10);
     }
 
-    const response = await fetch(`${API_BASE_URL}/search/progress`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(searchRequest),
-    });
+    // Production fallback: Try regular search endpoint if SSE fails
+    const useSSE = true;
+    let response: Response;
+
+    if (useSSE) {
+      response = await fetch(`${API_BASE_URL}/search/progress`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "Accept": "text/event-stream",
+          "Cache-Control": "no-cache",
+        },
+        body: JSON.stringify(searchRequest),
+      });
+    } else {
+      response = await fetch(`${API_BASE_URL}/search`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(searchRequest),
+      });
+    }
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    // For non-SSE response, parse JSON directly
+    if (!useSSE || !response.headers.get('content-type')?.includes('text/event-stream')) {
+      const results = await response.json();
+      if (onProgress) onProgress(100);
+      return results;
     }
 
     // Handle Server-Sent Events for progress updates
     const reader = response.body?.getReader();
     const decoder = new TextDecoder();
     let results: SearchResult[] = [];
+    let buffer = '';
 
-    if (reader) {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+    // Set a timeout for SSE response
+    const SSE_TIMEOUT = 600000; // 10 minutes (600 seconds) to accommodate long AI processing
+    let timeoutId: NodeJS.Timeout | null = null;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error('SSE stream timeout'));
+      }, SSE_TIMEOUT);
+    });
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+    try {
+      if (reader) {
+        await Promise.race([
+          (async () => {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6)) as { progress?: number; results?: SearchResult[]; error?: string };
+              buffer += decoder.decode(value, { stream: true });
               
-              if (data.progress && onProgress) {
-                onProgress(data.progress);
+              // Process complete lines
+              let newlineIndex;
+              while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+                const line = buffer.slice(0, newlineIndex).trim();
+                buffer = buffer.slice(newlineIndex + 1);
+
+                if (line.startsWith('data: ')) {
+                  try {
+                    const jsonData = line.slice(6).trim();
+                    
+                    if (jsonData && jsonData !== '') {
+                      const data = JSON.parse(jsonData) as {
+                        progress?: number;
+                        results?: SearchResult[];
+                        error?: string;
+                        message?: string;
+                      };
+                      
+                      if (typeof data.progress === 'number' && onProgress) {
+                        onProgress(Math.min(data.progress, 100));
+                      }
+                      
+                      if (data.results && Array.isArray(data.results) && data.results.length > 0) {
+                        results = data.results;
+                        // If we have results and progress is 100, we're done
+                        if (data.progress === 100) {
+                          if (timeoutId) clearTimeout(timeoutId);
+                          return;
+                        }
+                      }
+                      
+                      if (data.error) {
+                        throw new Error(data.error);
+                      }
+                    }
+                  } catch (parseError) {
+                    console.warn('Failed to parse SSE data:', parseError, 'Line:', line);
+                    // Continue processing other lines instead of breaking
+                  }
+                }
               }
-              
-              if (data.results) {
-                results = data.results;
-              }
-              
-              if (data.error) {
-                throw new Error(data.error);
-              }
-            } catch (parseError) {
-              console.warn('Failed to parse SSE data:', parseError);
             }
+          })(),
+          timeoutPromise
+        ]);
+      }
+    } catch (error) {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (error instanceof Error && error.message === 'SSE stream timeout') {
+        console.warn('SSE timeout, falling back to regular search');
+        // Fallback to regular search endpoint
+        try {
+          const fallbackResponse = await fetch(`${API_BASE_URL}/search`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(searchRequest),
+          });
+          
+          if (fallbackResponse.ok) {
+            const fallbackResults = await fallbackResponse.json();
+            if (onProgress) onProgress(100);
+            return fallbackResults;
           }
+        } catch (fallbackError) {
+          console.error('Fallback search also failed:', fallbackError);
         }
       }
+      throw error;
     }
 
+    if (timeoutId) clearTimeout(timeoutId);
     return results;
   } catch (error) {
     console.error("Failed to search connections:", error);
