@@ -10,7 +10,56 @@ import {
   SearchHistory
 } from "./types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
+// Determine the API base URL based on environment
+const getApiBaseUrl = (): string => {
+  // If explicitly set, use that
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL;
+  }
+  
+  // In production, try to infer from the current domain
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname } = window.location;
+    
+    // If we're on the production domain, use the production API
+    if (hostname === 'www.superconnectai.com' || hostname === 'superconnectai.com') {
+      return `${protocol}//api.superconnectai.com/api/v1`;
+    }
+    
+    // For other domains in production, try common patterns
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      // Try subdomain pattern first
+      const apiSubdomain = `${protocol}//api.${hostname}/api/v1`;
+      return apiSubdomain;
+    }
+  }
+  
+  // Fallback to localhost for development
+  return "http://localhost:8000/api/v1";
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Add logging for debugging in production
+if (typeof window !== 'undefined') {
+  console.log('API_BASE_URL configured as:', API_BASE_URL);
+}
+
+// Enhanced error handling wrapper
+const handleApiError = (error: unknown, context: string): never => {
+  console.error(`API Error in ${context}:`, error);
+  console.error('Current API_BASE_URL:', API_BASE_URL);
+  
+  if (error instanceof Error) {
+    // Add more context to network errors
+    if (error.message.includes('fetch')) {
+      throw new Error(`Network error in ${context}: ${error.message}. Check if API server is running at ${API_BASE_URL}`);
+    }
+    throw error;
+  }
+  
+  throw new Error(`Unknown error in ${context}: ${String(error)}`);
+};
 
 export async function createWarmIntroRequest(
   requesterName: string,
@@ -38,8 +87,7 @@ export async function createWarmIntroRequest(
 
     return await response.json();
   } catch (error) {
-    console.error("Failed to create warm intro request:", error);
-    throw error;
+    return handleApiError(error, "createWarmIntroRequest");
   }
 }
 
@@ -76,8 +124,7 @@ export async function updateWarmIntroRequestStatus(
 
         return await response.json();
     } catch (error) {
-        console.error("Failed to update warm intro request status:", error);
-        throw error;
+      return handleApiError(error, "updateWarmIntroRequestStatus");
     }
 }
 
@@ -111,8 +158,7 @@ export async function getWarmIntroRequests(
 
     return await response.json();
   } catch (error) {
-    console.error("Failed to fetch warm intro requests:", error);
-    throw error;
+    return handleApiError(error, "getWarmIntroRequests");
   }
 }
 
@@ -221,8 +267,7 @@ export async function loginUser(email: string, password: string): Promise<{ acce
 
     return await response.json();
   } catch (error) {
-    console.error("Failed to login:", error);
-    throw error;
+    return handleApiError(error, "loginUser");
   }
 }
 
@@ -279,8 +324,7 @@ export async function getUserProfile(token: string): Promise<{ id: string; email
 
     return await response.json();
   } catch (error) {
-    console.error("Failed to get user profile:", error);
-    throw error;
+    return handleApiError(error, "getUserProfile");
   }
 }
 
