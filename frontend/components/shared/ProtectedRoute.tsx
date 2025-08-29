@@ -14,7 +14,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   }, [isLoggedIn, loading, router]);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen"><p>Loading...</p></div>;
+    return <div className="flex items-center justify-center h-screen"><p>Loading....</p></div>;
   }
 
   if (isLoggedIn) {
