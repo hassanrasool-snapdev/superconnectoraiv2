@@ -95,11 +95,11 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
     return "";
   };
 
-  const validateEmail = (email: string) => {
+  const validateEmail = useCallback((email: string) => {
     if (includeEmail && email.length === 0) return "Email is required when including email option is selected.";
     if (email.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Please enter a valid email address.";
     return "";
-  };
+  }, [includeEmail]);
 
   // Real-time validation
   useEffect(() => {
