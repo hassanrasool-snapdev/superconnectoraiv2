@@ -29,14 +29,36 @@ export default function DashboardPage() {
   const [searchProgress, setSearchProgress] = useState(0);
   const [connectionsCount, setConnectionsCount] = useState<number | null>(null);
   const [showTippingBanner, setShowTippingBanner] = useState(false);
- 
-   useEffect(() => {
-     if (token) {
-       getConnectionsCount(token)
-         .then(data => setConnectionsCount(data.count))
-         .catch(err => console.error("Failed to fetch connections count:", err));
-     }
-   }, [token]);
+  const [animatedProgress, setAnimatedProgress] = useState(0);
+
+  useEffect(() => {
+    if (token) {
+      getConnectionsCount(token)
+        .then(data => setConnectionsCount(data.count))
+        .catch(err => console.error("Failed to fetch connections count:", err));
+    }
+  }, [token]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (loading) {
+      setAnimatedProgress(0);
+      interval = setInterval(() => {
+        setAnimatedProgress(prev => {
+          if (prev >= 100) {
+            clearInterval(interval);
+            return 100;
+          }
+          return prev + 100 / 60;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [loading]);
  
    const handleSearch = async (e: React.FormEvent) => {
      e.preventDefault();
@@ -151,8 +173,8 @@ export default function DashboardPage() {
               <p className="text-sm text-gray-500 mb-4">
                 This search may take a few minutes so hang tight
               </p>
-              <Progress value={searchProgress} className="w-full" />
-              <p className="text-sm text-center text-gray-500 mt-2">{searchProgress}% complete</p>
+              <Progress value={animatedProgress} className="w-full" />
+              <p className="text-sm text-center text-gray-500 mt-2">{Math.round(animatedProgress)}% complete</p>
             </div>
           )}
         </div>

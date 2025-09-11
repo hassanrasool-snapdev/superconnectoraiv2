@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.db import connect_to_mongo, close_mongo_connection
+from app.services.threading_service import threading_service
 from app.routers import auth, connections, search, saved_searches, search_history, favorites, embeddings, pinecone_index, retrieval, generated_emails, tips, warm_intro_requests, health
 
 # Get the logger used by Uvicorn
@@ -14,9 +15,11 @@ uvicorn_error_logger.setLevel(logging.DEBUG)
 async def lifespan(app: FastAPI):
     # on startup
     await connect_to_mongo()
+    threading_service.start()
     yield
     # on shutdown
     await close_mongo_connection()
+    threading_service.stop()
 
 app = FastAPI(lifespan=lifespan)
 

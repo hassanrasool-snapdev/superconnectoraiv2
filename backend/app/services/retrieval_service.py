@@ -3,25 +3,22 @@ import math
 import asyncio
 import os
 import logging
-from typing import List, Dict, Any, Optional
-import openai
+from typing import List, Dict, Any, Optional, Tuple
+import google.generativeai as genai
 import httpx
 from pinecone import Pinecone
 from app.core.config import settings
 from app.services.embeddings_service import embeddings_service
+from app.services.threading_service import threading_service
 
 logger = logging.getLogger(__name__)
 
 class RetrievalService:
     def _to_snake_case(self, name: str) -> str:
         """Converts a camelCase string to snake_case."""
-        s1 = name[0].lower()
-        for char in name[1:]:
-            if char.isupper():
-                s1 += '_' + char.lower()
-            else:
-                s1 += char
-        return s1
+        import re
+        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
     def _convert_keys_to_snake_case(self, data: Any) -> Any:
         """Recursively converts dictionary keys from camelCase to snake_case."""
@@ -32,26 +29,17 @@ class RetrievalService:
         return data
 
     def __init__(self):
-        # Initialize OpenAI client
-        if not settings.OPENAI_API_KEY:
-            raise ValueError("OPENAI_API_KEY not found in environment variables")
+        # Initialize Gemini client
+        if not settings.GEMINI_API_KEY:
+            raise ValueError("GEMINI_API_KEY not found in environment variables")
         
         try:
-            # Create a custom HTTP client without proxy configuration
-            http_client = httpx.Client(
-                timeout=60.0,
-                limits=httpx.Limits(max_connections=100, max_keepalive_connections=20)
-            )
-            
-            # Initialize OpenAI client with custom HTTP client
-            self.openai_client = openai.OpenAI(
-                api_key=settings.OPENAI_API_KEY,
-                http_client=http_client
-            )
-            print("OpenAI client initialized successfully")
+            genai.configure(api_key=settings.GEMINI_API_KEY)
+            self.gemini_client = genai.GenerativeModel('gemini-1.5-pro-latest')
+            print("Gemini client initialized successfully")
         except Exception as e:
-            print(f"Error initializing OpenAI client: {e}")
-            raise ValueError(f"Failed to initialize OpenAI client: {e}")
+            print(f"Error initializing Gemini client: {e}")
+            raise ValueError(f"Failed to initialize Gemini client: {e}")
             
         # Initialize Pinecone client
         if settings.PINECONE_API_KEY:
@@ -73,7 +61,7 @@ class RetrievalService:
         
     async def rewrite_query_with_llm(self, verbose_query: str, enable_rewrite: bool = True) -> str:
         """
-        Optional LLM query rewrite using gpt-4o-mini to transform verbose query into concise search intent.
+        Optional LLM query rewrite using Gemini to transform verbose query into concise search intent.
         
         Args:
             verbose_query: The original user query
@@ -82,11 +70,11 @@ class RetrievalService:
         Returns:
             Rewritten query or original query if rewrite is disabled
         """
-        if not enable_rewrite or not self.openai_client:
+        if not enable_rewrite or not self.gemini_client:
             return verbose_query
             
         try:
-            system_prompt = """You are a query optimization assistant. Transform verbose user queries into concise, focused search intent sentences that capture the core requirements for finding relevant professional profiles.
+            prompt = f"""You are a query optimization assistant. Transform verbose user queries into concise, focused search intent sentences that capture the core requirements for finding relevant professional profiles.
 
 Focus on:
 - Key skills, roles, or expertise areas
@@ -95,19 +83,14 @@ Focus on:
 - Experience level or seniority
 - Specific qualifications or backgrounds
 
-Keep the output to 1-2 sentences maximum."""
+Keep the output to 1-2 sentences maximum.
 
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"Rewrite this query into a concise search intent: {verbose_query}"}
-                ],
-                max_tokens=100,
-                temperature=0.3
-            )
+Rewrite this query into a concise search intent: {verbose_query}"""
+
+            response = self.gemini_client.generate_content(prompt)
             
-            rewritten_query = response.choices[0].message.content.strip()
+            rewritten_query = response.text.strip()
+            
             print(f"Query rewritten from: '{verbose_query}' to: '{rewritten_query}'")
             return rewritten_query
             
@@ -175,28 +158,13 @@ Keep the output to 1-2 sentences maximum."""
 
             # Log the first profile's metadata for inspection
             if profiles:
-                logger.debug(f"Sample profile metadata from Pinecone: {profiles[0]}")
+                logger.debug(f"Sample profile metadata from Pinecone: {profiles}")
 
             return profiles
             
         except Exception as e:
             logger.error(f"Error performing hybrid Pinecone query: {e}", exc_info=True)
             raise
-    
-    def calculate_chunk_size(self) -> int:
-        """
-        Calculate the chunk size for profiles to send to the re-ranking model.
-        With enhanced pros/cons, we need smaller chunks to avoid response truncation.
-        
-        Returns:
-            Calculated chunk size
-        """
-        # With enhanced pros/cons (up to 5 each), responses are much longer
-        # Reduce chunk size to avoid truncation
-        chunk_size = 10  # Much smaller chunks for enhanced analysis
-        
-        print(f"Calculated chunk size: {chunk_size} profiles per batch")
-        return chunk_size
     
     def clean_json_response(self, response_content: str) -> str:
         """
@@ -220,39 +188,62 @@ Keep the output to 1-2 sentences maximum."""
             
         return content
     
-    async def rerank_with_openai(
+    def _extract_and_parse_json(self, text: str) -> Optional[List[Dict[str, Any]]]:
+        """
+        Find and parse the main JSON array from the model's response.
+        This is more robust against malformed JSON or extra text.
+        """
+        try:
+            # Find the start of the JSON array
+            start_index = text.find('[')
+            if start_index == -1:
+                logger.error("No JSON array found in the response.")
+                return None
+
+            # Find the end of the JSON array
+            end_index = text.rfind(']')
+            if end_index == -1:
+                logger.error("JSON array end not found.")
+                return None
+
+            # Extract the JSON string
+            json_str = text[start_index:end_index + 1]
+            
+            # Attempt to parse the extracted string
+            return json.loads(json_str)
+
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decoding failed: {e}")
+            # Fallback for common errors, like missing commas
+            try:
+                # Add commas between JSON objects
+                json_str = json_str.replace("}\n{", "},\n{")
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                logger.error("Fallback JSON parsing also failed.")
+                return None
+        except Exception as e:
+            logger.error(f"An unexpected error occurred during JSON extraction: {e}")
+            return None
+
+    def calculate_chunk_size(self) -> int:
+        """
+        Calculates the number of profiles to include in each chunk for re-ranking.
+        This is a simplified version that returns a fixed chunk size.
+        """
+        return 10
+
+    def _rerank_chunk(
         self,
-        candidates: List[Dict[str, Any]],
+        chunk: List[Dict[str, Any]],
         user_query: str
     ) -> List[Dict[str, Any]]:
         """
-        Re-rank candidates using gpt-4o with context budgeting.
-        
-        Args:
-            candidates: List of candidate profiles to re-rank
-            user_query: Original user query for context
-            
-        Returns:
-            List of re-ranked profiles with scores, pros, and cons
+        Re-ranks a single chunk of candidates using Gemini Pro.
         """
-        if not self.openai_client:
-            raise ValueError("OpenAI client not initialized. Please check OPENAI_API_KEY configuration.")
-            
-        if not candidates:
-            return []
-            
-        chunk_size = self.calculate_chunk_size()
-        all_results = []
-        
-        # Process candidates in chunks
-        for i in range(0, len(candidates), chunk_size):
-            chunk = candidates[i:i + chunk_size]
-            print(f"Processing chunk {i//chunk_size + 1} with {len(chunk)} profiles")
-            
-            try:
-                # Prepare the system prompt
-                system_prompt = """You are a sophisticated recruiting assistant responsible for accurately scoring professional profiles against a user's search query. Your task is to provide a relevance score from 0 to 10, where 10 indicates a perfect match and 0 indicates no relevance.
-
+        try:
+            # Prepare the system prompt
+            prompt = """You are a sophisticated recruiting assistant responsible for accurately scoring professional profiles against a user's search query. Your task is to provide a relevance score from 0 to 10, where 10 indicates a perfect match and 0 indicates no relevance.
 **Scoring Guidelines:**
 - **10:** Perfect match. The profile explicitly meets all key criteria in the user's query.
 - **9:** Excellent match.
@@ -261,25 +252,16 @@ Keep the output to 1-2 sentences maximum."""
 - **5-6:** Average match. Meets some criteria but has notable gaps.
 - **1-3:** Poor match. Tangentially related but not a good fit.
 - **0:** No match. The profile is completely irrelevant to the query.
-
 For each profile, provide up to 5 reasons "Why this may be a good match" and up to 5 reasons "Why this may not be a good match". Each reason should be a concise sentence directly relevant to the user's search query. Only include reasons that are clearly supported by the profile information. Do not include generic or irrelevant statements.
-"""
-                
-                # Prepare the user message with profiles
-                profiles_json = json.dumps(chunk, indent=2)
-                user_message = """User Query: "{}"
-
+User Query: "{}"
 Profiles to evaluate:
 {}
-
 Please respond with a JSON array where each object has:
 - "profile_id": The profile identifier (use the "id" field from each profile).
 - "score": An integer from 0 to 10, representing relevance.
 - "pros": An array of up to 5 detailed strengths/advantages (each as a concise sentence) that are directly relevant to the user query.
 - "cons": An array of up to 5 detailed weaknesses/concerns (each as a concise sentence) that are directly relevant to the user query.
-
 IMPORTANT: For "profile_id", use the exact value from the "id" field of each profile in the JSON above.
-
 Example format:
 [
   {{
@@ -293,91 +275,75 @@ Example format:
       "Limited experience with specific tools mentioned in requirements."
     ]
   }}
-]""".format(user_query, profiles_json)
+]""".format(user_query, json.dumps(chunk, indent=2))
 
-                # Call gpt-4o
-                response = self.openai_client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_message}
-                    ],
-                    max_tokens=8000,  # Increased for enhanced pros/cons
-                    temperature=0.3
-                )
-                
-                # Parse the response
-                ai_response = response.choices[0].message.content.strip()
-                logger.info(f"Raw OpenAI response for re-ranking: {ai_response}")
-                
-                try:
-                    # Clean the response before parsing JSON
-                    cleaned_response = self.clean_json_response(ai_response)
+            # Call Gemini Pro
+            response = self.gemini_client.generate_content(prompt)
+            
+            # Parse the response
+            ai_response = response.text.strip()
+            logger.info(f"Raw Gemini response for re-ranking chunk: {ai_response}")
+            
+            # Use the robust JSON parsing function
+            reranked_results = self._extract_and_parse_json(ai_response)
+            
+            if not reranked_results:
+                logger.error("Failed to parse JSON response from Gemini for a chunk")
+                return []
+
+            # Validate and process results
+            chunk_results = []
+            for result in reranked_results:
+                if isinstance(result, dict) and all(key in result for key in ["profile_id", "score", "pros", "cons"]):
+                    result_profile_id = str(result["profile_id"])
+                    profile_data = next((p for p in chunk if str(p.get("id", "")) == result_profile_id or str(p.get("profile_id", "")) == result_profile_id), None)
                     
-                    # Check if response is empty or just whitespace
-                    if not cleaned_response.strip():
-                        logger.error(f"Empty response from OpenAI for chunk {i//chunk_size + 1}")
-                        continue
-                    
-                    # Try to parse as JSON
-                    chunk_results = json.loads(cleaned_response)
-                    
-                    # Validate and process results
-                    for result in chunk_results:
-                        if isinstance(result, dict) and all(key in result for key in ["profile_id", "score", "pros", "cons"]):
-                            # Find the original profile data with improved matching logic
-                            result_profile_id = str(result["profile_id"])
-                            profile_data = None
-                            
-                            # Try multiple matching strategies
-                            for p in chunk:
-                                # Strategy 1: Match against 'id' field
-                                if str(p.get("id", "")) == result_profile_id:
-                                    profile_data = p
-                                    break
-                                # Strategy 2: Match against 'profile_id' field
-                                elif str(p.get("profile_id", "")) == result_profile_id:
-                                    profile_data = p
-                                    break
-                                # Strategy 3: Match against '_id' field (if still present)
-                                elif str(p.get("_id", "")) == result_profile_id:
-                                    profile_data = p
-                                    break
-                                # Strategy 4: Match against linkedin_url (original Pinecone ID)
-                                elif str(p.get("linkedin_url", "")) == result_profile_id:
-                                    profile_data = p
-                                    break
-                            
-                            if profile_data:
-                                pros = result.get("pros", [])
-                                cons = result.get("cons", [])
-                                
-                                all_results.append({
-                                    "profile": profile_data,
-                                    "score": max(0, min(10, int(float(result["score"])))),  # Ensure score is 0-10
-                                    "pros": pros,
-                                    "cons": cons,
-                                    # Keep backward compatibility
-                                    "pro": pros[0] if pros else "Strong candidate match.",
-                                    "con": cons[0] if cons else "Some limitations may apply."
-                                })
-                                logger.debug(f"Successfully matched profile_id: {result_profile_id}")
-                            else:
-                                logger.warning(f"Could not find profile data for profile_id: {result_profile_id}")
-                                logger.warning(f"Available profile IDs in chunk: {[str(p.get('id', p.get('profile_id', p.get('_id', 'unknown')))) for p in chunk]}")
-                                
-                except json.JSONDecodeError:
-                    logger.error(f"Failed to parse JSON response for chunk {i//chunk_size + 1}: {ai_response}")
-                    raise
+                    if profile_data:
+                        pros = result.get("pros", [])
+                        cons = result.get("cons", [])
                         
-            except Exception as e:
-                logger.error(f"Error processing chunk {i//chunk_size + 1}: {e}", exc_info=True)
-                raise
+                        summary = " ".join(pros) + " " + " ".join(cons)
+                        chunk_results.append({
+                            "profile": profile_data,
+                            "score": max(0, min(10, int(float(result["score"])))),
+                            "pros": pros,
+                            "cons": cons,
+                            "summary": summary,
+                            "pro": " ".join(pros) if pros else "Strong candidate match.",
+                            "con": " ".join(cons) if cons else "Some limitations may apply."
+                        })
+                        logger.debug(f"Successfully matched profile_id: {result_profile_id}")
+                    else:
+                        logger.warning(f"Could not find profile data for profile_id: {result_profile_id}")
+            return chunk_results
+            
+        except Exception as e:
+            logger.error(f"Error processing chunk: {e}", exc_info=True)
+            return []
+
+    async def rerank_with_gemini(
+        self,
+        candidates: List[Dict[str, Any]],
+        user_query: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Re-rank candidates using Gemini Pro with context budgeting and parallel processing.
+        """
+        if not candidates:
+            return []
+            
+        chunk_size = self.calculate_chunk_size()
+        chunks = [candidates[i:i + chunk_size] for i in range(0, len(candidates), chunk_size)]
         
-        # Sort by score descending
+        args_list = [(chunk, user_query) for chunk in chunks]
+        
+        results_from_threads = threading_service.run_in_parallel(self._rerank_chunk, args_list)
+        
+        all_results = [item for sublist in results_from_threads if sublist for item in sublist]
+        
         all_results.sort(key=lambda x: x["score"], reverse=True)
         
-        print(f"Re-ranked {len(all_results)} profiles using OpenAI")
+        print(f"Re-ranked {len(all_results)} profiles using Gemini")
         return all_results
     
     async def retrieve_and_rerank(
@@ -423,7 +389,7 @@ Example format:
             
             logger.info(f"Re-ranking {len(candidate_profiles)} candidates.")
             # Step 4: Chunk and re-rank candidates using OpenAI
-            reranked_results = await self.rerank_with_openai(candidate_profiles, user_query)
+            reranked_results = await self.rerank_with_gemini(candidate_profiles, user_query)
             
             # Step 5: Filter results based on relevance score
             filtered_results = [result for result in reranked_results if result['score'] >= 6]
