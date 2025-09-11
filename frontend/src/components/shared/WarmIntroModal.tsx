@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import {
   Dialog,
   DialogContent,
@@ -189,7 +190,7 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
     }
   }, [isOpen, targetFirstName, targetLastName, theirCompany, linkedinUrl, profilePicture]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     const hasUnsavedChanges = requesterName || requesterLinkedIn || reason || about || email;
     
     if (hasUnsavedChanges) {
@@ -219,7 +220,7 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
       onClose();
       resetForm();
     }
-  };
+  }, [requesterName, requesterLinkedIn, reason, about, email, targetFirstName, targetLastName, modalOpenTime, onClose]);
 
   const resetForm = () => {
     setRequesterName('');
@@ -273,7 +274,7 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!isFormValid) {
       // Focus first invalid field
       const firstError = Object.keys(errors)[0];
@@ -499,7 +500,7 @@ ${emailBody}`;
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [isFormValid, errors, requesterName, reason, about, includeEmail, email, targetFirstName, targetLastName, linkedinUrl, token, toast, onClose]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -575,7 +576,13 @@ ${emailBody}`;
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
               {profilePicture ? (
-                <img src={profilePicture} alt={targetFirstName} className="w-full h-full object-cover" />
+                <Image
+                  src={profilePicture}
+                  alt={targetFirstName}
+                  className="w-full h-full object-cover"
+                  width={32}
+                  height={32}
+                />
               ) : (
                 <User className="w-4 h-4 text-gray-500" />
               )}

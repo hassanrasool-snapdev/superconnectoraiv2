@@ -26,7 +26,6 @@ export default function DashboardPage() {
   const [isTippingModalOpen, setIsTippingModalOpen] = useState(false);
   const [isWarmIntroModalOpen, setIsWarmIntroModalOpen] = useState(false);
   const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
-  const [searchProgress, setSearchProgress] = useState(0);
   const [connectionsCount, setConnectionsCount] = useState<number | null>(null);
   const [showTippingBanner, setShowTippingBanner] = useState(false);
   const [animatedProgress, setAnimatedProgress] = useState(0);
@@ -70,15 +69,14 @@ export default function DashboardPage() {
     setLoading(true);
     setError(null);
     setHasSearched(true);
-    setSearchProgress(0);
     setResults([]);
 
     try {
       const searchResults = await searchConnectionsWithProgress(
         { query: query.trim() },
         token,
-        (progress) => {
-          setSearchProgress(progress);
+        () => {
+          // Progress callback - no longer tracking progress
         }
       );
       setResults(searchResults);
@@ -90,7 +88,6 @@ export default function DashboardPage() {
       setResults([]);
     } finally {
       setLoading(false);
-      setSearchProgress(100);
     }
   };
 
