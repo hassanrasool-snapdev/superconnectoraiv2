@@ -15,6 +15,15 @@ class ConnectionBase(BaseModel):
     description: Optional[str] = None
     headline: Optional[str] = None
     rating: Optional[int] = None
+    profile_picture: Optional[str] = None
+    
+    # Premium and Status Badges
+    is_premium: bool = False
+    is_top_voice: bool = False
+    is_influencer: bool = False
+    is_hiring: bool = False
+    is_open_to_work: bool = False
+    is_creator: bool = False
     
     # Connection Information
     connected_on: Optional[str] = None

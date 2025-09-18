@@ -593,18 +593,47 @@ export async function getConnections(
 export async function getSavedSearches(
   token: string
 ): Promise<SavedSearch[]> {
-  // Mock implementation - replace with actual API call when backend is ready
-  console.log(token); // Prevent unused parameter error
-  return Promise.resolve([]);
+  try {
+    const response = await fetch(`${API_BASE_URL}/saved-searches`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    return handleApiError(error, "getSavedSearches");
+  }
 }
 
 export async function deleteSavedSearch(
   searchId: string,
   token: string
 ): Promise<{ success: boolean }> {
-  // Mock implementation - replace with actual API call when backend is ready
-  console.log(searchId, token); // Prevent unused parameter errors
-  return Promise.resolve({ success: true });
+  try {
+    const response = await fetch(`${API_BASE_URL}/saved-searches/${searchId}`, {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to delete saved search:", error);
+    throw error;
+  }
 }
 
 export async function getSearchHistory(
@@ -680,6 +709,33 @@ export async function exportConnectedRequestsCSV(token: string): Promise<Blob> {
   } catch (error) {
     console.error("Failed to export connected requests CSV:", error);
     throw error;
+  }
+}
+
+export async function getFilterOptions(token: string): Promise<{
+  industries: string[];
+  company_sizes: string[];
+  locations: string[];
+  professional_status_counts: Record<string, number>;
+  total_connections: number;
+  generated_from: string;
+}> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/filter-options`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    return handleApiError(error, "getFilterOptions");
   }
 }
 

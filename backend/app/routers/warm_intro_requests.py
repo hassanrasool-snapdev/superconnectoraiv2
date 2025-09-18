@@ -10,6 +10,7 @@ import io
 from app.services.auth_service import get_current_user
 from app.services import warm_intro_requests_service
 from app.models.warm_intro_request import WarmIntroStatus
+from app.services.follow_up_email_service import schedule_follow_up_email
 from app.core.db import get_database
 
 router = APIRouter()
@@ -252,6 +253,22 @@ async def update_warm_intro_request_status(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to update warm intro request status"
             )
+        
+        # If the status is being updated to "connected", schedule a follow-up email
+        if request.status == WarmIntroStatus.connected:
+            try:
+                await schedule_follow_up_email(
+                    db=db,
+                    warm_intro_request_id=str(request_id),
+                    requester_email=current_user.get("email", ""),
+                    requester_name=updated_request.requester_name,
+                    connection_name=updated_request.connection_name,
+                    facilitator_email="ha@superconnect.ai",  # Default facilitator email
+                    follow_up_days=14  # Default 14 days
+                )
+            except Exception as e:
+                # Log the error but don't fail the request update
+                print(f"Warning: Failed to schedule follow-up email: {str(e)}")
         
         return WarmIntroRequestResponse(
             id=str(updated_request.id),

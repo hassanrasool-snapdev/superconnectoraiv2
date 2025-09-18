@@ -35,7 +35,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
+    // Clear auth token
     localStorage.removeItem('authToken');
+    
+    // Clear user-specific data if user exists
+    if (user?.id) {
+      const userPrefix = `user_${user.id}_`;
+      // Remove user-specific search data
+      localStorage.removeItem(`${userPrefix}superconnect_search_results`);
+      localStorage.removeItem(`${userPrefix}superconnect_search_query`);
+      localStorage.removeItem(`${userPrefix}superconnect_search_filters`);
+      
+      // Clear any other user-specific localStorage items
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(userPrefix)) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+    }
+    
     setToken(null);
     setUser(null);
   };

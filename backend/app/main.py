@@ -4,7 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.db import connect_to_mongo, close_mongo_connection
 from app.services.threading_service import threading_service
-from app.routers import auth, connections, search, saved_searches, search_history, favorites, embeddings, pinecone_index, retrieval, generated_emails, tips, warm_intro_requests, health
+from app.services.scheduler_service import start_scheduler, stop_scheduler
+from app.routers import auth, connections, search, saved_searches, search_history, favorites, embeddings, pinecone_index, retrieval, generated_emails, tips, warm_intro_requests, health, invitations, follow_up_emails, filter_options
 
 # Get the logger used by Uvicorn
 uvicorn_error_logger = logging.getLogger("uvicorn.error")
@@ -16,8 +17,10 @@ async def lifespan(app: FastAPI):
     # on startup
     await connect_to_mongo()
     threading_service.start()
+    await start_scheduler()
     yield
     # on shutdown
+    await stop_scheduler()
     await close_mongo_connection()
     threading_service.stop()
 
@@ -26,8 +29,8 @@ app = FastAPI(lifespan=lifespan)
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins from all regions
-    allow_credentials=False,  # Must be False when allow_origins is ["*"]
+    allow_origins=["http://localhost:3000"],  # Allows frontend origin
+    allow_credentials=True,  # Can be True when specific origins are listed
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
@@ -45,3 +48,6 @@ app.include_router(generated_emails.router, prefix="/api/v1", tags=["generated-e
 app.include_router(tips.router, prefix="/api/v1", tags=["Tipping"])
 app.include_router(warm_intro_requests.router, prefix="/api/v1", tags=["Warm Intro Requests"])
 app.include_router(health.router, prefix="/api/v1", tags=["Health"])
+app.include_router(invitations.router, prefix="/api/v1", tags=["Invitations"])
+app.include_router(follow_up_emails.router, prefix="/api/v1", tags=["Follow-up Emails"])
+app.include_router(filter_options.router, prefix="/api/v1", tags=["Filter Options"])

@@ -8,7 +8,7 @@ import google.generativeai as genai
 import httpx
 from pinecone import Pinecone
 from app.core.config import settings
-from app.services.embeddings_service import embeddings_service
+from app.services.gemini_embeddings_service import gemini_embeddings_service
 from app.services.threading_service import threading_service
 
 logger = logging.getLogger(__name__)
@@ -164,7 +164,8 @@ Rewrite this query into a concise search intent: {verbose_query}"""
             
         except Exception as e:
             logger.error(f"Error performing hybrid Pinecone query: {e}", exc_info=True)
-            raise
+            # Return empty list to trigger fallback instead of raising
+            return []
     
     def clean_json_response(self, response_content: str) -> str:
         """
@@ -372,7 +373,7 @@ Example format:
             processed_query = await self.rewrite_query_with_llm(user_query, enable_query_rewrite)
             
             # Step 2: Generate embedding for the query
-            query_embedding = await embeddings_service.generate_embedding(processed_query)
+            query_embedding = await gemini_embeddings_service.generate_embedding(processed_query)
             
             # Step 3: Execute hybrid query against Pinecone
             candidate_profiles = await self.hybrid_pinecone_query(
@@ -384,8 +385,12 @@ Example format:
             )
             
             if not candidate_profiles:
-                logger.warning("No profiles found in Pinecone query")
-                return []
+                logger.warning("No profiles found in Pinecone query, falling back to MongoDB search")
+                # Fallback to MongoDB text search when Pinecone returns no results
+                candidate_profiles = await self.fallback_mongodb_search(user_query, user_id, filter_dict)
+                if not candidate_profiles:
+                    logger.warning("No profiles found in MongoDB fallback either")
+                    return []
             
             logger.info(f"Re-ranking {len(candidate_profiles)} candidates.")
             # Step 4: Chunk and re-rank candidates using OpenAI
@@ -412,6 +417,170 @@ Example format:
         except Exception as e:
             logger.error(f"Error in retrieve_and_rerank: {e}", exc_info=True)
             raise
+    
+    async def fallback_mongodb_search(
+        self,
+        user_query: str,
+        user_id: str,
+        filter_dict: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Fallback MongoDB text search when Pinecone fails or returns no results.
+        Uses MongoDB's text search capabilities on connection data.
+        """
+        try:
+            from app.core.db import get_database
+            db = get_database()
+            
+            # Build MongoDB query - start with empty query for testing
+            mongo_query = {}
+            
+            # Only filter by user_id if connections actually have user_id field
+            # For testing purposes, we'll search all connections if no user_id field exists
+            try:
+                user_id_count = await db.connections.count_documents({"user_id": {"$exists": True}})
+                if user_id_count > 0:
+                    mongo_query["user_id"] = user_id
+                else:
+                    logger.info("No connections have user_id field, searching all connections for testing")
+            except Exception as e:
+                logger.warning(f"Could not check for user_id field: {e}, proceeding without user_id filter")
+            
+            # Add text search
+            search_terms = user_query.lower().split()
+            text_conditions = []
+            
+            for term in search_terms:
+                # Search across multiple fields - support both field name formats
+                term_conditions = [
+                    # Original format (from Google Sheets direct import)
+                    {"fullName": {"$regex": term, "$options": "i"}},
+                    {"headline": {"$regex": term, "$options": "i"}},
+                    {"about": {"$regex": term, "$options": "i"}},
+                    {"companyName": {"$regex": term, "$options": "i"}},
+                    {"title": {"$regex": term, "$options": "i"}},
+                    {"experiences": {"$regex": term, "$options": "i"}},
+                    {"skills": {"$regex": term, "$options": "i"}},
+                    {"city": {"$regex": term, "$options": "i"}},
+                    {"country": {"$regex": term, "$options": "i"}},
+                    # Alternative format (from auto_import_google_sheets.py)
+                    {"name": {"$regex": term, "$options": "i"}},
+                    {"company": {"$regex": term, "$options": "i"}},
+                    {"description": {"$regex": term, "$options": "i"}},
+                    {"location": {"$regex": term, "$options": "i"}}
+                ]
+                text_conditions.append({"$or": term_conditions})
+            
+            if text_conditions:
+                mongo_query["$and"] = text_conditions
+            
+            # Apply filters if provided
+            if filter_dict:
+                logger.info(f"Applying filters: {filter_dict}")
+                
+                # Handle different filter types
+                for key, value in filter_dict.items():
+                    if key == "$or":
+                        # Handle location filters (multiple OR conditions)
+                        if "$and" not in mongo_query:
+                            mongo_query["$and"] = []
+                        mongo_query["$and"].append({"$or": value})
+                    elif key == "company_industry":
+                        # Handle industry filters
+                        if "$and" not in mongo_query:
+                            mongo_query["$and"] = []
+                        if "$in" in value:
+                            # Convert to case-insensitive regex for each industry
+                            industry_conditions = []
+                            for industry in value["$in"]:
+                                industry_conditions.extend([
+                                    {"company_industry": {"$regex": industry, "$options": "i"}},
+                                    {"companyName": {"$regex": industry, "$options": "i"}},
+                                    {"experiences": {"$regex": industry, "$options": "i"}}
+                                ])
+                            mongo_query["$and"].append({"$or": industry_conditions})
+                    elif key == "company_size":
+                        # Handle company size filters
+                        if "$and" not in mongo_query:
+                            mongo_query["$and"] = []
+                        if "$in" in value:
+                            # Direct match for company size
+                            mongo_query["$and"].append({"company_size": value})
+                    elif key in ["is_hiring", "is_open_to_work", "is_company_owner", "has_pe_vc_role"]:
+                        # Handle boolean filters
+                        if "$and" not in mongo_query:
+                            mongo_query["$and"] = []
+                        # Convert field names to match MongoDB schema
+                        field_name = key
+                        if key == "is_open_to_work":
+                            field_name = "isOpenToWork"
+                        elif key == "is_hiring":
+                            field_name = "isHiring"
+                        elif key == "is_company_owner":
+                            field_name = "is_company_owner"
+                        
+                        mongo_query["$and"].append({field_name: value})
+                    else:
+                        # Handle other filters directly
+                        mongo_query[key] = value
+            
+            logger.info(f"MongoDB query: {mongo_query}")
+            
+            # Execute MongoDB query
+            cursor = db.connections.find(mongo_query).limit(30)
+            connections = await cursor.to_list(length=30)
+            
+            logger.info(f"MongoDB fallback found {len(connections)} connections")
+            
+            # Convert to the format expected by the re-ranking system
+            profiles = []
+            for conn in connections:
+                # Extract name information - handle both fullName and name fields
+                full_name = conn.get("fullName", conn.get("name", ""))
+                
+                # Split full name into first and last name
+                name_parts = full_name.strip().split() if full_name else []
+                first_name = name_parts[0] if name_parts else ""
+                last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
+                
+                # Convert MongoDB document to profile format with camelCase first
+                profile = {
+                    "id": str(conn.get("_id", conn.get("id", ""))),
+                    "fullName": full_name,
+                    "firstName": first_name,
+                    "lastName": last_name,
+                    "headline": conn.get("headline", ""),
+                    "about": conn.get("about", ""),
+                    "city": conn.get("city", ""),
+                    "country": conn.get("country", ""),
+                    "companyName": conn.get("companyName", conn.get("company", "")),
+                    "title": conn.get("title", ""),
+                    "experiences": conn.get("experiences", ""),
+                    "education": conn.get("education", ""),
+                    "skills": conn.get("skills", ""),
+                    "linkedin_url": conn.get("linkedin_url", ""),
+                    "profilePicture": conn.get("profilePicture", conn.get("profile_picture", "")),
+                    "followerCount": conn.get("followerCount", conn.get("follower_count", 0)),
+                    "connectionsCount": conn.get("connectionsCount", conn.get("connections_count", 0)),
+                    "isOpenToWork": conn.get("isOpenToWork", conn.get("is_open_to_work", False)),
+                    "isHiring": conn.get("isHiring", conn.get("is_hiring", False)),
+                    "isPremium": conn.get("isPremium", conn.get("is_premium", False)),
+                    "isTopVoice": conn.get("isTopVoice", conn.get("is_top_voice", False)),
+                    "isInfluencer": conn.get("isInfluencer", conn.get("is_influencer", False)),
+                    "isCreator": conn.get("isCreator", conn.get("is_creator", False)),
+                    "is_company_owner": conn.get("is_company_owner", False),
+                    "company_industry": conn.get("company_industry", ""),
+                    "company_size": conn.get("company_size", "")
+                }
+                # Convert to snake_case to match Pinecone results format
+                profile_snake_case = self._convert_keys_to_snake_case(profile)
+                profiles.append(profile_snake_case)
+            
+            return profiles
+            
+        except Exception as e:
+            logger.error(f"Error in MongoDB fallback search: {e}", exc_info=True)
+            return []
 
 # Global instance
 retrieval_service = RetrievalService()

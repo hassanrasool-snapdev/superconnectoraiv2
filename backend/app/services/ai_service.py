@@ -2,7 +2,7 @@ import json
 import re
 from typing import List, Dict, Any
 from app.core.config import settings
-import openai
+import google.generativeai as genai
 
 async def search_connections(user_id: str, query: str, connections: List[dict]) -> List[dict]:
     # This is a placeholder for the actual AI search logic.
@@ -23,27 +23,28 @@ async def search_connections(user_id: str, query: str, connections: List[dict]) 
 
 async def generate_email_content(reason: str) -> str:
     """
-    Generate email content using OpenAI's GPT-4o.
+    Generate email content using Gemini Pro.
     """
-    if not settings.OPENAI_API_KEY:
-        raise ValueError("OPENAI_API_KEY not found in environment variables")
-
-    client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+    if not settings.GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY not found in environment variables")
 
     try:
-        system_prompt = "You are a helpful assistant that writes professional outreach emails."
-        user_prompt = f"Write a professional outreach email for the following reason: {reason}"
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        model = genai.GenerativeModel('gemini-1.5-pro-latest')
+        
+        prompt = f"""You are a helpful assistant that writes professional outreach emails.
 
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            max_tokens=500,
-            temperature=0.7
-        )
-        return response.choices[0].message.content.strip()
+Write a professional outreach email for the following reason: {reason}
+
+Please make the email:
+- Professional and courteous
+- Clear and concise
+- Personalized and engaging
+- Include a clear call to action
+- Keep it under 200 words"""
+
+        response = model.generate_content(prompt)
+        return response.text.strip()
     except Exception as e:
-        print(f"Error generating email content: {e}")
+        print(f"Error generating email content with Gemini: {e}")
         return "Error generating email content."

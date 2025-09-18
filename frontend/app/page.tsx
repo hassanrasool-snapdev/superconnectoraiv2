@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 export default function Home() {
   const router = useRouter();
   useEffect(() => {
-    router.replace('/login');
+    router.replace('/landing');
   }, [router]);
   return <div className="flex items-center justify-center h-screen"><p>Redirecting...</p></div>;
 }

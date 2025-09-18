@@ -535,13 +535,13 @@ ${emailBody}`;
               <p className="text-gray-600">We will reach out to {targetFirstName} {targetLastName} and follow up with you.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button onClick={() => { onClose(); resetForm(); }} className="px-6">
+              <Button onClick={() => { onClose(); resetForm(); }} className="px-6 cursor-pointer">
                 Close
               </Button>
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 onClick={() => { setShowSuccess(false); resetForm(); }}
-                className="text-sm"
+                className="text-sm cursor-pointer"
               >
                 Make another intro request
               </Button>
@@ -574,7 +574,7 @@ ${emailBody}`;
           
           {/* Byline */}
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
               {profilePicture ? (
                 <Image
                   src={profilePicture}
@@ -582,9 +582,20 @@ ${emailBody}`;
                   className="w-full h-full object-cover"
                   width={32}
                   height={32}
+                  onError={(e) => {
+                    // Fallback to initials if image fails to load
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent) {
+                      parent.innerHTML = `<span class="text-white font-semibold text-xs">${targetFirstName?.[0] || ''}${targetLastName?.[0] || ''}</span>`;
+                    }
+                  }}
                 />
               ) : (
-                <User className="w-4 h-4 text-gray-500" />
+                <span className="text-white font-semibold text-xs">
+                  {targetFirstName?.[0] || ''}{targetLastName?.[0] || ''}
+                </span>
               )}
             </div>
             <p className="text-sm text-gray-600">
@@ -851,15 +862,15 @@ ${emailBody}`;
         {/* Footer */}
         <div className="pt-6 border-t border-gray-200 space-y-4">
           <div className="flex flex-col sm:flex-row gap-3 justify-end">
-            <Button variant="ghost" onClick={handleClose} className="sm:order-1">
+            <Button variant="ghost" onClick={handleClose} className="sm:order-1 cursor-pointer">
               Cancel
             </Button>
-            <Button 
-              onClick={handleSubmit} 
+            <Button
+              onClick={handleSubmit}
               disabled={!isFormValid || isSubmitting}
-              className="sm:order-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-30"
+              className="sm:order-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Sending...' : 'Send Request'}
+              {isSubmitting ? 'Submitting...' : 'Submit for Review'}
             </Button>
           </div>
           <p className="text-xs text-gray-500 text-center">

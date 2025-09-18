@@ -1,7 +1,11 @@
 export interface User {
   id: string;
   email: string;
+  role: string;
+  status?: string;
+  is_premium?: boolean;
   created_at: string;
+  last_login?: string | null;
 }
 
 export interface Connection {

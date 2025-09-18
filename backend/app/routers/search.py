@@ -24,6 +24,16 @@ class SearchFilters(BaseModel):
     date_range_end: Optional[str] = None
     min_followers: Optional[int] = None
     max_followers: Optional[int] = None
+    # Employment status - mutually exclusive
+    hiring_status: Optional[str] = None  # "hiring" or "open_to_work"
+    # Individual boolean filters for employment status
+    is_hiring: Optional[bool] = None
+    is_open_to_work: Optional[bool] = None
+    # Role types - can be combined with employment status
+    is_company_owner: Optional[bool] = None
+    has_pe_vc_role: Optional[bool] = None
+    employment_status: Optional[str] = None  # "current" or "past"
+    geo_location: Optional[str] = None
 
 class SearchRequest(BaseModel):
     query: str
@@ -306,6 +316,30 @@ def convert_search_filters_to_pinecone_filter(filters: SearchFilters) -> dict:
         if location_conditions:
             filter_dict["$or"] = location_conditions
     
+    # Employment status filter - mutually exclusive (legacy support)
+    if filters.hiring_status:
+        if filters.hiring_status == "hiring":
+            filter_dict["is_hiring"] = {"$eq": True}
+        elif filters.hiring_status == "open_to_work":
+            filter_dict["is_open_to_work"] = {"$eq": True}
+    
+    # Individual boolean filters for employment status
+    if filters.is_hiring is not None:
+        filter_dict["is_hiring"] = {"$eq": filters.is_hiring}
+    
+    if filters.is_open_to_work is not None:
+        filter_dict["is_open_to_work"] = {"$eq": filters.is_open_to_work}
+    
+    # Role type filters - can be combined
+    if filters.is_company_owner is not None:
+        filter_dict["is_company_owner"] = {"$eq": filters.is_company_owner}
+    
+    if filters.has_pe_vc_role is not None:
+        filter_dict["has_pe_vc_role"] = {"$eq": filters.has_pe_vc_role}
+    
+    if filters.geo_location:
+        filter_dict["geo_location"] = {"$eq": filters.geo_location}
+    
     # Note: Date range and follower filters would need to be handled differently
     # in Pinecone as they require numeric comparisons
     
@@ -342,6 +376,19 @@ def apply_search_filters(connections: List[dict], filters: SearchFilters) -> Lis
                 location.lower() in conn.get('country', '').lower()
                 for location in filters.locations
             )
+        ]
+    
+    # Filter by individual boolean filters
+    if filters.is_hiring is not None:
+        filtered_connections = [
+            conn for conn in filtered_connections
+            if conn.get('is_hiring') == filters.is_hiring or conn.get('isHiring') == filters.is_hiring
+        ]
+    
+    if filters.is_open_to_work is not None:
+        filtered_connections = [
+            conn for conn in filtered_connections
+            if conn.get('is_open_to_work') == filters.is_open_to_work or conn.get('isOpenToWork') == filters.is_open_to_work
         ]
     
     # Filter by connection date range
