@@ -76,24 +76,36 @@ async def update_access_request(db, request_id: str, update_data: AccessRequestU
     # Return updated request
     updated_request = await get_access_request_by_id(db, request_id)
 
-    # Send email notification for rejected status
+    # Generate email template data for rejected status
     if update_data.status == AccessRequestStatus.rejected:
         template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'access-denied.html')
         with open(template_path, 'r') as f:
             html_content = f.read()
         
-        await send_email_via_sendgrid(
-            to_email=updated_request["email"],
-            subject="Update on your access request",
-            html_content=html_content
-        )
+        # Convert HTML to plain text for email body
+        email_body = f"""Hello {updated_request['full_name']},
+
+Thank you for your interest. After careful consideration, we are unable to approve your access request at this time.
+
+We appreciate you taking the time to submit a request.
+
+Sincerely,
+The Superconnector Team"""
+        
+        # Store email template data in the response
+        updated_request["email_template"] = {
+            "to": updated_request["email"],
+            "subject": "Update on your access request",
+            "body": email_body
+        }
 
     return updated_request
 
 async def approve_access_request_and_create_user(db, request_id: str, admin_id: str):
     """Approve an access request and automatically create user with OTP"""
-    from app.services.auth_service import create_user_with_otp
+    from app.services.auth_service import create_user_with_otp, get_user_by_email, generate_temporary_password
     from app.models.user import AdminUserCreate
+    from app.core import security
     
     # Get the access request
     request = await get_access_request_by_id(db, request_id)
@@ -104,9 +116,32 @@ async def approve_access_request_and_create_user(db, request_id: str, admin_id: 
             detail="Only pending requests can be approved"
         )
     
-    # Create user with OTP
-    user_data = AdminUserCreate(email=request["email"])
-    user_dict, temp_password = await create_user_with_otp(db, user_data)
+    # Check if user already exists
+    existing_user = await get_user_by_email(db, request["email"])
+    
+    if existing_user:
+        # User already exists, just generate a new temporary password and update it
+        temp_password = generate_temporary_password()
+        hashed_password = security.get_password_hash(temp_password)
+        
+        # Update existing user with new temporary password and must_change_password flag
+        await db.users.update_one(
+            {"email": request["email"]},
+            {
+                "$set": {
+                    "hashed_password": hashed_password,
+                    "must_change_password": True,
+                    "status": "active"  # Ensure user is active
+                }
+            }
+        )
+        
+        # Get updated user data
+        user_dict = await get_user_by_email(db, request["email"])
+    else:
+        # Create new user with OTP
+        user_data = AdminUserCreate(email=request["email"])
+        user_dict, temp_password = await create_user_with_otp(db, user_data)
     
     # Update access request status
     await update_access_request(
@@ -119,15 +154,31 @@ async def approve_access_request_and_create_user(db, request_id: str, admin_id: 
         admin_id
     )
     
-    # Send approval email
+    # Generate approval email template data
     template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'access-approved.html')
     with open(template_path, 'r') as f:
         html_content = f.read().replace("{{ temporary_password }}", temp_password)
 
-    await send_email_via_sendgrid(
-        to_email=request["email"],
-        subject="Your access request has been approved!",
-        html_content=html_content
-    )
+    # Convert to plain text for email body
+    email_body = f"""Hello {request['full_name']},
+
+Welcome! Your request for access has been approved by an administrator.
+
+To log in for the first time, please use the following temporary passcode. You will be prompted to create a new password after logging in.
+
+Temporary Passcode: {temp_password}
+
+If you have any questions, please don't hesitate to contact us.
+
+Thank you!
+The Superconnector Team"""
+
+    # Create email template data
+    email_template = {
+        "to": request["email"],
+        "subject": "Your access request has been approved!",
+        "body": email_body,
+        "temp_password": temp_password
+    }
     
-    return user_dict, temp_password
+    return user_dict, temp_password, email_template

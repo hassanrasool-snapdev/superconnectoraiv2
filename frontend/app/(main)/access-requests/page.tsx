@@ -63,12 +63,24 @@ export default function AccessRequestsPage() {
     
     try {
       setProcessingId(requestId);
-      await approveAccessRequest(requestId, token);
+      const response = await approveAccessRequest(requestId, token);
       
-      toast({
-        title: "Request Approved",
-        description: "User created and an approval email with temporary password has been sent.",
-      });
+      // Open email client with pre-drafted approval email
+      if (response.email_template) {
+        const { to, subject, body } = response.email_template;
+        const mailtoLink = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.open(mailtoLink, '_blank');
+        
+        toast({
+          title: "Request Approved",
+          description: "User created successfully. Your email client should open with a pre-drafted approval email.",
+        });
+      } else {
+        toast({
+          title: "Request Approved",
+          description: "User created successfully, but email template was not generated.",
+        });
+      }
       
       // Refresh the list
       await fetchRequests();
@@ -88,12 +100,24 @@ export default function AccessRequestsPage() {
     
     try {
       setProcessingId(selectedRequest.id);
-      await denyAccessRequest(selectedRequest.id, token, denyReason);
+      const response = await denyAccessRequest(selectedRequest.id, token, denyReason);
       
-      toast({
-        title: "Request Denied",
-        description: "Access request has been denied and a notification email has been sent.",
-      });
+      // Open email client with pre-drafted denial email
+      if (response.email_template) {
+        const { to, subject, body } = response.email_template;
+        const mailtoLink = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.open(mailtoLink, '_blank');
+        
+        toast({
+          title: "Request Denied",
+          description: "Access request denied successfully. Your email client should open with a pre-drafted denial email.",
+        });
+      } else {
+        toast({
+          title: "Request Denied",
+          description: "Access request denied successfully, but email template was not generated.",
+        });
+      }
       
       // Reset dialog state
       setDenyDialogOpen(false);
@@ -238,7 +262,7 @@ export default function AccessRequestsPage() {
                     </div>
                   )}
                   <p className="text-xs text-gray-500 mt-2">
-                    📧 User will be notified via email of your decision
+                    📧 Your email client will open with a pre-drafted email to send to the user
                   </p>
                 </div>
               </CardContent>

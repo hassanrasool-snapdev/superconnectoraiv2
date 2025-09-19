@@ -817,15 +817,23 @@ export async function approveAccessRequest(
   requestId: string,
   token: string
 ): Promise<{
-  id: string;
-  email: string;
-  role: string;
-  status: string;
-  is_premium: boolean;
-  must_change_password: boolean;
-  created_at: string;
-  last_login?: string;
-  otp: string;
+  user: {
+    id: string;
+    email: string;
+    role: string;
+    status: string;
+    is_premium: boolean;
+    must_change_password: boolean;
+    created_at: string;
+    last_login?: string;
+    otp: string;
+  };
+  email_template: {
+    to: string;
+    subject: string;
+    body: string;
+    temp_password: string;
+  };
 }> {
   try {
     const response = await fetch(`${API_BASE_URL}/admin/access-requests/${requestId}/approve`, {
@@ -851,14 +859,21 @@ export async function denyAccessRequest(
   token: string,
   adminNotes?: string
 ): Promise<{
-  id: string;
-  email: string;
-  full_name: string;
-  reason?: string;
-  organization?: string;
-  status: string;
-  created_at: string;
-  processed_at?: string;
+  request: {
+    id: string;
+    email: string;
+    full_name: string;
+    reason?: string;
+    organization?: string;
+    status: string;
+    created_at: string;
+    processed_at?: string;
+  };
+  email_template?: {
+    to: string;
+    subject: string;
+    body: string;
+  };
 }> {
   try {
     const response = await fetch(`${API_BASE_URL}/admin/access-requests/${requestId}`, {

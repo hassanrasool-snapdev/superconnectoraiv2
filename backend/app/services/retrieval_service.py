@@ -230,9 +230,50 @@ Rewrite this query into a concise search intent: {verbose_query}"""
     def calculate_chunk_size(self) -> int:
         """
         Calculates the number of profiles to include in each chunk for re-ranking.
-        This is a simplified version that returns a fixed chunk size.
+        Reduced chunk size to prevent token limit issues.
         """
-        return 10
+        return 5
+
+    def _truncate_profile_for_ai(self, profile: Dict[str, Any], max_chars: int = 800) -> Dict[str, Any]:
+        """
+        Truncate profile data to prevent token limit issues while preserving key information.
+        
+        Args:
+            profile: Profile dictionary
+            max_chars: Maximum characters for text fields
+            
+        Returns:
+            Truncated profile dictionary
+        """
+        truncated_profile = {}
+        
+        # Essential fields to always include (short fields)
+        essential_fields = ['id', 'profile_id', 'full_name', 'first_name', 'last_name', 'city', 'country', 'company_name', 'title']
+        
+        # Text fields that need truncation
+        text_fields = ['headline', 'about', 'experiences', 'education', 'skills', 'canonical_text']
+        
+        # Copy essential fields
+        for field in essential_fields:
+            if field in profile:
+                truncated_profile[field] = profile[field]
+        
+        # Truncate text fields
+        for field in text_fields:
+            if field in profile and profile[field]:
+                text = str(profile[field])
+                if len(text) > max_chars:
+                    truncated_profile[field] = text[:max_chars] + "..."
+                else:
+                    truncated_profile[field] = text
+        
+        # Include boolean flags and numeric fields
+        for key, value in profile.items():
+            if key not in essential_fields and key not in text_fields:
+                if isinstance(value, (bool, int, float)) or (isinstance(value, str) and len(str(value)) < 50):
+                    truncated_profile[key] = value
+        
+        return truncated_profile
 
     def _rerank_chunk(
         self,
@@ -240,11 +281,15 @@ Rewrite this query into a concise search intent: {verbose_query}"""
         user_query: str
     ) -> List[Dict[str, Any]]:
         """
-        Re-ranks a single chunk of candidates using Gemini Pro.
+        Re-ranks a single chunk of candidates using Gemini Pro with token management.
         """
         try:
+            # Truncate profiles to prevent token limit issues
+            truncated_chunk = [self._truncate_profile_for_ai(profile) for profile in chunk]
+            
             # Prepare the system prompt
             prompt = """You are a sophisticated recruiting assistant responsible for accurately scoring professional profiles against a user's search query. Your task is to provide a relevance score from 0 to 10, where 10 indicates a perfect match and 0 indicates no relevance.
+
 **Scoring Guidelines:**
 - **10:** Perfect match. The profile explicitly meets all key criteria in the user's query.
 - **9:** Excellent match.
@@ -253,16 +298,22 @@ Rewrite this query into a concise search intent: {verbose_query}"""
 - **5-6:** Average match. Meets some criteria but has notable gaps.
 - **1-3:** Poor match. Tangentially related but not a good fit.
 - **0:** No match. The profile is completely irrelevant to the query.
-For each profile, provide up to 5 reasons "Why this may be a good match" and up to 5 reasons "Why this may not be a good match". Each reason should be a concise sentence directly relevant to the user's search query. Only include reasons that are clearly supported by the profile information. Do not include generic or irrelevant statements.
+
+For each profile, provide up to 3 reasons "Why this may be a good match" and up to 3 reasons "Why this may not be a good match". Each reason should be a concise sentence directly relevant to the user's search query.
+
 User Query: "{}"
+
 Profiles to evaluate:
 {}
+
 Please respond with a JSON array where each object has:
 - "profile_id": The profile identifier (use the "id" field from each profile).
 - "score": An integer from 0 to 10, representing relevance.
-- "pros": An array of up to 5 detailed strengths/advantages (each as a concise sentence) that are directly relevant to the user query.
-- "cons": An array of up to 5 detailed weaknesses/concerns (each as a concise sentence) that are directly relevant to the user query.
+- "pros": An array of up to 3 detailed strengths/advantages (each as a concise sentence).
+- "cons": An array of up to 3 detailed weaknesses/concerns (each as a concise sentence).
+
 IMPORTANT: For "profile_id", use the exact value from the "id" field of each profile in the JSON above.
+
 Example format:
 [
   {{
@@ -276,7 +327,7 @@ Example format:
       "Limited experience with specific tools mentioned in requirements."
     ]
   }}
-]""".format(user_query, json.dumps(chunk, indent=2))
+]""".format(user_query, json.dumps(truncated_chunk, indent=2))
 
             # Call Gemini Pro
             response = self.gemini_client.generate_content(prompt)

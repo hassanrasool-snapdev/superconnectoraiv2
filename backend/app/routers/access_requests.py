@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import Optional, List
 from app.models.access_request import (
-    AccessRequestCreate, 
-    AccessRequestPublic, 
+    AccessRequestCreate,
+    AccessRequestPublic,
     AccessRequestUpdate,
     AccessRequestStatus
 )
@@ -38,7 +38,7 @@ async def get_access_request(
     request = await access_request_service.get_access_request_by_id(db, request_id)
     return AccessRequestPublic(**request)
 
-@router.patch("/admin/access-requests/{request_id}", response_model=AccessRequestPublic)
+@router.patch("/admin/access-requests/{request_id}")
 async def update_access_request(
     request_id: str,
     update_data: AccessRequestUpdate,
@@ -49,16 +49,25 @@ async def update_access_request(
     updated_request = await access_request_service.update_access_request(
         db, request_id, update_data, current_admin["id"]
     )
-    return AccessRequestPublic(**updated_request)
+    
+    # If there's an email template (for rejections), include it in the response
+    if "email_template" in updated_request:
+        email_template = updated_request.pop("email_template")
+        return {
+            "request": AccessRequestPublic(**updated_request).model_dump(),
+            "email_template": email_template
+        }
+    
+    return {"request": AccessRequestPublic(**updated_request).model_dump()}
 
-@router.post("/admin/access-requests/{request_id}/approve", response_model=UserWithOTP)
+@router.post("/admin/access-requests/{request_id}/approve")
 async def approve_access_request(
     request_id: str,
     db=Depends(get_database),
     current_admin: dict = Depends(auth_service.get_current_admin_user)
 ):
     """Admin endpoint to approve an access request and create user with OTP"""
-    user_dict, temp_password = await access_request_service.approve_access_request_and_create_user(
+    user_dict, temp_password, email_template = await access_request_service.approve_access_request_and_create_user(
         db, request_id, current_admin["id"]
     )
     
@@ -75,4 +84,10 @@ async def approve_access_request(
         last_login=user_dict.get("last_login")
     )
     
-    return UserWithOTP(**user_public.model_dump(), otp=temp_password)
+    user_with_otp = UserWithOTP(**user_public.model_dump(), otp=temp_password)
+    
+    # Return both user data and email template for frontend to use
+    return {
+        "user": user_with_otp.model_dump(),
+        "email_template": email_template
+    }
