@@ -250,7 +250,7 @@ async function clearPineconeData(token: string): Promise<{ message: string }> {
 }
 
 // Real authentication implementations
-export async function loginUser(email: string, password: string): Promise<{ access_token: string; token_type: string }> {
+export async function loginUser(email: string, password: string): Promise<{ access_token: string; token_type: string } | { reset_token: string; token_type: string }> {
   try {
     const formData = new FormData();
     formData.append('username', email);
@@ -308,7 +308,7 @@ export async function getGeneratedEmails(
   return Promise.resolve([]);
 }
 
-export async function getUserProfile(token: string): Promise<{ id: string; email: string; name: string; created_at: string }> {
+export async function getUserProfile(token: string): Promise<{ id: string; email: string; role: string; status: string; is_premium: boolean; created_at: string; last_login?: string }> {
   try {
     const response = await fetch(`${API_BASE_URL}/users/me`, {
       method: "GET",
@@ -736,6 +736,178 @@ export async function getFilterOptions(token: string): Promise<{
     return await response.json();
   } catch (error) {
     return handleApiError(error, "getFilterOptions");
+  }
+}
+
+// Access Request API functions
+export async function submitAccessRequest(
+  requestData: {
+    email: string;
+    full_name: string;
+    reason?: string;
+    organization?: string;
+  }
+): Promise<{
+  id: string;
+  email: string;
+  full_name: string;
+  reason?: string;
+  organization?: string;
+  status: string;
+  created_at: string;
+}> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/access-requests`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    return handleApiError(error, "submitAccessRequest");
+  }
+}
+
+export async function getAccessRequests(
+  token: string,
+  statusFilter?: string
+): Promise<{
+  id: string;
+  email: string;
+  full_name: string;
+  reason?: string;
+  organization?: string;
+  status: string;
+  created_at: string;
+  processed_at?: string;
+}[]> {
+  try {
+    const params = new URLSearchParams();
+    if (statusFilter) {
+      params.append('status_filter', statusFilter);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/admin/access-requests?${params}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    return handleApiError(error, "getAccessRequests");
+  }
+}
+
+export async function approveAccessRequest(
+  requestId: string,
+  token: string
+): Promise<{
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  is_premium: boolean;
+  must_change_password: boolean;
+  created_at: string;
+  last_login?: string;
+  otp: string;
+}> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/access-requests/${requestId}/approve`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    return handleApiError(error, "approveAccessRequest");
+  }
+}
+
+export async function denyAccessRequest(
+  requestId: string,
+  token: string,
+  adminNotes?: string
+): Promise<{
+  id: string;
+  email: string;
+  full_name: string;
+  reason?: string;
+  organization?: string;
+  status: string;
+  created_at: string;
+  processed_at?: string;
+}> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/access-requests/${requestId}`, {
+      method: "PATCH",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        status: "rejected",
+        admin_notes: adminNotes
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    return handleApiError(error, "denyAccessRequest");
+  }
+}
+
+// Password Reset API functions
+export async function resetPassword(
+  resetToken: string,
+  newPassword: string
+): Promise<{ access_token: string; token_type: string }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        reset_token: resetToken,
+        new_password: newPassword
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    return handleApiError(error, "resetPassword");
   }
 }
 

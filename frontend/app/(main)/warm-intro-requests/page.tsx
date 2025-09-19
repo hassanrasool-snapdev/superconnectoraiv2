@@ -328,6 +328,29 @@ export default function WarmIntroRequestsPage() {
     }
   };
 
+  const get14DayOutcome = (request: WarmIntroRequest) => {
+    // If status is declined, return N/A regardless of other logic
+    if (request.status === WarmIntroStatus.declined) {
+      return "N/A";
+    }
+    
+    // If outcome exists, display it
+    if (request.outcome) {
+      return request.outcome;
+    }
+    
+    // If outcome is null, check if request is more than 14 days old
+    const createdDate = new Date(request.created_at);
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    
+    if (createdDate < fourteenDaysAgo) {
+      return "No response";
+    } else {
+      return "N/A";
+    }
+  };
+
   if (loading && requests.length === 0) {
     return (
       <div className="container mx-auto p-4">
@@ -451,6 +474,7 @@ export default function WarmIntroRequestsPage() {
                   <TableHead>Requester</TableHead>
                   <TableHead>Connection</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>14 Day Outcome</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Updated</TableHead>
                   <TableHead>Actions</TableHead>
@@ -459,7 +483,7 @@ export default function WarmIntroRequestsPage() {
               <TableBody>
                 {requests.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                       No warm intro requests found
                     </TableCell>
                   </TableRow>
@@ -471,12 +495,15 @@ export default function WarmIntroRequestsPage() {
                       </TableCell>
                       <TableCell>{request.connection_name}</TableCell>
                       <TableCell>
-                        <Badge 
+                        <Badge
                           variant={getStatusBadgeVariant(request.status)}
                           className={cn("capitalize", getStatusColor(request.status))}
                         >
                           {request.status}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">
+                        {get14DayOutcome(request)}
                       </TableCell>
                       <TableCell className="text-sm text-gray-600">
                         {new Date(request.created_at).toLocaleDateString()}

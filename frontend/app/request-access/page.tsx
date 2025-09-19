@@ -1,0 +1,146 @@
+'use client';
+
+import { useState } from 'react';
+import { submitAccessRequest } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import Link from 'next/link';
+
+export default function RequestAccessPage() {
+  const [formData, setFormData] = useState({
+    email: '',
+    full_name: '',
+    organization: '',
+    reason: ''
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      await submitAccessRequest(formData);
+      setSuccess(true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-2xl text-center text-green-600">Request Submitted!</CardTitle>
+            <CardDescription className="text-center">
+              Your access request has been submitted successfully.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-sm text-gray-600 mb-4">
+              We&apos;ll review your request and get back to you via email within 1-2 business days.
+            </p>
+            <p className="text-xs text-gray-500">
+              If you already have an account, you can{' '}
+              <Link href="/login" className="text-blue-600 hover:underline">
+                sign in here
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-2xl">Request Access</CardTitle>
+          <CardDescription>
+            Fill out the form below to request access to Superconnect AI.
+          </CardDescription>
+        </CardHeader>
+        <form onSubmit={handleSubmit}>
+          <CardContent className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="full_name">Full Name *</Label>
+              <Input
+                id="full_name"
+                name="full_name"
+                type="text"
+                placeholder="John Doe"
+                required
+                value={formData.full_name}
+                onChange={handleInputChange}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email Address *</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="john@example.com"
+                required
+                value={formData.email}
+                onChange={handleInputChange}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="organization">Organization</Label>
+              <Input
+                id="organization"
+                name="organization"
+                type="text"
+                placeholder="Your company or organization"
+                value={formData.organization}
+                onChange={handleInputChange}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="reason">Reason for Access</Label>
+              <Textarea
+                id="reason"
+                name="reason"
+                placeholder="Please briefly explain why you need access to Superconnect AI..."
+                rows={4}
+                value={formData.reason}
+                onChange={handleInputChange}
+              />
+            </div>
+            {error && <p className="text-red-500 text-sm">{error}</p>}
+          </CardContent>
+          <CardFooter className="flex flex-col">
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? 'Submitting Request...' : 'Submit Request'}
+            </Button>
+            <p className="mt-4 text-xs text-center text-gray-700">
+              Already have an account?{' '}
+              <Link href="/login" className="underline">
+                Sign in
+              </Link>
+            </p>
+          </CardFooter>
+        </form>
+      </Card>
+    </div>
+  );
+}

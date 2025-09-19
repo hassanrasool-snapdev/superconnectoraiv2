@@ -1,0 +1,288 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { getAccessRequests, approveAccessRequest, denyAccessRequest } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { Copy, Check } from 'lucide-react';
+
+interface AccessRequest {
+  id: string;
+  email: string;
+  full_name: string;
+  reason?: string;
+  organization?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  processed_at?: string;
+}
+
+export default function AccessRequestsPage() {
+  const { token } = useAuth();
+  const { toast } = useToast();
+  const [requests, setRequests] = useState<AccessRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [denyDialogOpen, setDenyDialogOpen] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<AccessRequest | null>(null);
+  const [denyReason, setDenyReason] = useState('');
+  const fetchRequests = async () => {
+    if (!token) return;
+    
+    try {
+      setLoading(true);
+      const filter = statusFilter === 'all' ? undefined : statusFilter;
+      const data = await getAccessRequests(token, filter);
+      setRequests(data as AccessRequest[]);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch access requests",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRequests();
+  }, [token, statusFilter]);
+
+  const handleApprove = async (requestId: string) => {
+    if (!token) return;
+    
+    try {
+      setProcessingId(requestId);
+      await approveAccessRequest(requestId, token);
+      
+      toast({
+        title: "Request Approved",
+        description: "User created and an approval email with temporary password has been sent.",
+      });
+      
+      // Refresh the list
+      await fetchRequests();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to approve request",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleDeny = async () => {
+    if (!token || !selectedRequest) return;
+    
+    try {
+      setProcessingId(selectedRequest.id);
+      await denyAccessRequest(selectedRequest.id, token, denyReason);
+      
+      toast({
+        title: "Request Denied",
+        description: "Access request has been denied and a notification email has been sent.",
+      });
+      
+      // Reset dialog state
+      setDenyDialogOpen(false);
+      setSelectedRequest(null);
+      setDenyReason('');
+      
+      // Refresh the list
+      await fetchRequests();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to deny request",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const openDenyDialog = (request: AccessRequest) => {
+    setSelectedRequest(request);
+    setDenyDialogOpen(true);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pending</Badge>;
+      case 'approved':
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Approved</Badge>;
+      case 'rejected':
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Rejected</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg">Loading access requests...</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Access Requests</h1>
+          <p className="text-gray-600 mt-2">Manage user access requests to the platform</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Requests</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {requests.length === 0 ? (
+        <Card>
+          <CardContent className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <p className="text-lg text-gray-500">No access requests found</p>
+              <p className="text-sm text-gray-400 mt-2">
+                {statusFilter !== 'all' ? `No ${statusFilter} requests` : 'No requests have been submitted yet'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          {requests.map((request) => (
+            <Card key={request.id}>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-lg">{request.full_name}</CardTitle>
+                    <CardDescription>{request.email}</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {getStatusBadge(request.status)}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4">
+                  {request.organization && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">Organization</Label>
+                      <p className="text-sm text-gray-600">{request.organization}</p>
+                    </div>
+                  )}
+                  {request.reason && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">Reason for Access</Label>
+                      <p className="text-sm text-gray-600">{request.reason}</p>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center text-xs text-gray-500">
+                    <span>Submitted: {formatDate(request.created_at)}</span>
+                    {request.processed_at && (
+                      <span>Processed: {formatDate(request.processed_at)}</span>
+                    )}
+                  </div>
+                  {request.status === 'pending' && (
+                    <div className="flex gap-2 pt-4 border-t">
+                      <Button
+                        onClick={() => handleApprove(request.id)}
+                        disabled={processingId === request.id}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {processingId === request.id ? 'Approving...' : 'Approve'}
+                      </Button>
+                      <Button
+                        onClick={() => openDenyDialog(request)}
+                        disabled={processingId === request.id}
+                        variant="destructive"
+                      >
+                        Deny
+                      </Button>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500 mt-2">
+                    📧 User will be notified via email of your decision
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={denyDialogOpen} onOpenChange={setDenyDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deny Access Request</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deny access for {selectedRequest?.full_name}? 
+              You can optionally provide a reason below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="deny-reason">Reason for denial (optional)</Label>
+              <Textarea
+                id="deny-reason"
+                placeholder="Provide a reason for denying this request..."
+                value={denyReason}
+                onChange={(e) => setDenyReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDenyDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeny}
+              disabled={processingId === selectedRequest?.id}
+            >
+              {processingId === selectedRequest?.id ? 'Denying...' : 'Deny Request'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+    </div>
+  );
+}

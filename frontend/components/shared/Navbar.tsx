@@ -9,6 +9,7 @@ const adminNavLinks = [
   { href: '/dashboard', label: 'Search Connections' },
   { href: '/data-management', label: 'Upload Connections' },
   { href: '/warm-intro-requests', label: 'Warm Intro Requests' },
+  { href: '/access-requests', label: 'Access Requests' },
 ];
 
 const userNavLinks: { href: string; label: string }[] = [

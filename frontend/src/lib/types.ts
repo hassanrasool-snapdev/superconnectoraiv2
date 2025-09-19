@@ -141,6 +141,7 @@ export interface WarmIntroRequest {
   connection_first_name?: string | null;
   connection_last_name?: string | null;
   status: WarmIntroStatus;
+  outcome?: string | null;
   created_at: string;
   updated_at: string;
   connected_date?: string | null;
@@ -153,4 +154,34 @@ export interface PaginatedWarmIntroRequests {
   page: number;
   limit: number;
   total_pages: number;
+}
+
+// Access Request types
+export interface AccessRequest {
+  id: string;
+  email: string;
+  full_name: string;
+  reason?: string;
+  organization?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  processed_at?: string;
+}
+
+export interface AccessRequestCreate {
+  email: string;
+  full_name: string;
+  reason?: string;
+  organization?: string;
+}
+
+// Password Reset types
+export interface PasswordResetToken {
+  reset_token: string;
+  token_type: string;
+}
+
+export interface PasswordResetRequest {
+  new_password: string;
+  reset_token: string;
 }

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { loginUser, getUserProfile } from '@/lib/api';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -15,13 +16,24 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsSubmitting(true);
     try {
-      const { access_token } = await loginUser(email, password);
+      const response = await loginUser(email, password);
+      
+      // Check if this is a password reset response
+      if ('reset_token' in response) {
+        // User needs to reset password - redirect to reset page
+        router.push(`/reset-password?token=${response.reset_token}`);
+        return;
+      }
+      
+      // Normal login flow
+      const { access_token } = response;
       const userProfile = await getUserProfile(access_token);
       login(access_token, userProfile);
       // Redirect is now handled by the PublicRoute wrapper
@@ -57,8 +69,8 @@ export default function LoginPage() {
             </Button>
             <p className="mt-4 text-xs text-center text-gray-700">
               Don&apos;t have an account?{' '}
-              <Link href="/register" className="underline">
-                Register
+              <Link href="/request-access" className="underline">
+                Request Access
               </Link>
             </p>
           </CardFooter>

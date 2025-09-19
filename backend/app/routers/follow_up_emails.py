@@ -16,8 +16,10 @@ from app.services.follow_up_email_service import (
     cancel_follow_up_email,
     get_follow_ups_by_warm_intro,
     get_follow_up_stats,
-    process_pending_follow_ups
+    process_pending_follow_ups,
+    process_automated_follow_ups
 )
+from app.services.scheduler_service import get_scheduler_status, trigger_manual_follow_up_processing
 from app.core.db import get_database
 import logging
 
@@ -271,4 +273,95 @@ async def get_all_follow_up_emails(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get follow-up emails: {str(e)}"
+        )
+
+@router.get("/scheduler/status")
+async def get_follow_up_scheduler_status(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get the status of the follow-up email scheduler"""
+    try:
+        # Only admin users can view scheduler status
+        if current_user.role != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admin users can view scheduler status"
+            )
+        
+        status_info = await get_scheduler_status()
+        return status_info
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting scheduler status: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get scheduler status: {str(e)}"
+        )
+
+@router.post("/process-all")
+async def manually_process_all_follow_ups(
+    current_user: dict = Depends(get_current_user)
+):
+    """Manually trigger processing of all follow-up emails (both legacy and automated)"""
+    try:
+        # Only admin users can trigger manual processing
+        if current_user.role != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admin users can trigger manual follow-up processing"
+            )
+        
+        result = await trigger_manual_follow_up_processing()
+        
+        if result["success"]:
+            return {
+                "message": "Follow-up processing completed successfully",
+                "legacy_processed": result["legacy_processed"],
+                "automated_processed": result["automated_processed"],
+                "total_processed": result["total_processed"],
+                "timestamp": result["timestamp"]
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Follow-up processing failed: {result['error']}"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error triggering manual follow-up processing: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to trigger manual processing: {str(e)}"
+        )
+
+@router.post("/process-automated")
+async def manually_process_automated_follow_ups(
+    current_user: dict = Depends(get_current_user)
+):
+    """Manually trigger processing of automated follow-up emails only"""
+    try:
+        # Only admin users can trigger manual processing
+        if current_user.role != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admin users can trigger automated follow-up processing"
+            )
+        
+        processed_count = await process_automated_follow_ups()
+        
+        return {
+            "message": "Automated follow-up processing completed successfully",
+            "processed_count": processed_count,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error triggering automated follow-up processing: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to trigger automated processing: {str(e)}"
         )

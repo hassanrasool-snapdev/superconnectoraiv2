@@ -17,6 +17,7 @@ class WarmIntroRequestBase(BaseModel):
     connection_first_name: Optional[str] = None
     connection_last_name: Optional[str] = None
     status: WarmIntroStatus = WarmIntroStatus.pending
+    outcome: Optional[str] = None
 
 class WarmIntroRequest(WarmIntroRequestBase):
     id: UUID = Field(default_factory=uuid4)
@@ -25,6 +26,9 @@ class WarmIntroRequest(WarmIntroRequestBase):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     connected_date: Optional[datetime] = None
     declined_date: Optional[datetime] = None
+    follow_up_sent_date: Optional[datetime] = None
+    user_responded: Optional[bool] = None
+    response_date: Optional[datetime] = None
 
     class Config:
         # Allow the model to be serialized with aliases
@@ -38,6 +42,9 @@ class WarmIntroRequestPublic(WarmIntroRequestBase):
     updated_at: datetime
     connected_date: Optional[datetime] = None
     declined_date: Optional[datetime] = None
+    follow_up_sent_date: Optional[datetime] = None
+    user_responded: Optional[bool] = None
+    response_date: Optional[datetime] = None
 
 class WarmIntroRequestCreate(BaseModel):
     requester_name: str
@@ -47,8 +54,10 @@ class WarmIntroRequestCreate(BaseModel):
     connection_first_name: Optional[str] = None
     connection_last_name: Optional[str] = None
     status: WarmIntroStatus = WarmIntroStatus.pending
+    outcome: Optional[str] = None
 
 class WarmIntroRequestUpdate(BaseModel):
     status: WarmIntroStatus
     connected_date: Optional[datetime] = None
     declined_date: Optional[datetime] = None
+    outcome: Optional[str] = None

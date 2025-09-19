@@ -21,5 +21,11 @@ class Settings(BaseSettings):
     PINECONE_INDEX_NAME: str = os.getenv("PINECONE_INDEX_NAME", "profile-embeddings")
     PINECONE_CLOUD: str = os.getenv("PINECONE_CLOUD", "aws")
     PINECONE_REGION: str = os.getenv("PINECONE_REGION", "us-east-1")
+    
+    # Email Configuration
+    SENDGRID_API_KEY: str = os.getenv("SENDGRID_API_KEY", "")
+    FROM_EMAIL: str = os.getenv("FROM_EMAIL", "noreply@superconnector.ai")
+    FROM_NAME: str = os.getenv("FROM_NAME", "Superconnector Team")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 settings = Settings()
