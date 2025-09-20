@@ -156,8 +156,8 @@ async def main():
             print(f"\n✨ SUCCESS: Processed {sent_count} follow-up email(s)")
             print("📋 Next steps for testing:")
             print("1. Copy the response links from the email content above")
-            print("2. Paste them into your browser to test the response pages")
-            print("3. Check that the warm-intro-response page works correctly")
+            print("2. Follow-up emails now ask users to reply directly to the email")
+            print("3. The warm-intro-response pages have been removed from the system")
             print("4. Check that the donate page works correctly")
         else:
             print("\n⚠️  No emails were processed.")

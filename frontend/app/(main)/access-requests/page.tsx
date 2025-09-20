@@ -7,8 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -32,9 +30,6 @@ export default function AccessRequestsPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [denyDialogOpen, setDenyDialogOpen] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState<AccessRequest | null>(null);
-  const [denyReason, setDenyReason] = useState('');
   const fetchRequests = async () => {
     if (!token) return;
     
@@ -95,12 +90,12 @@ export default function AccessRequestsPage() {
     }
   };
 
-  const handleDeny = async () => {
-    if (!token || !selectedRequest) return;
+  const handleDeny = async (request: AccessRequest) => {
+    if (!token) return;
     
     try {
-      setProcessingId(selectedRequest.id);
-      const response = await denyAccessRequest(selectedRequest.id, token, denyReason);
+      setProcessingId(request.id);
+      const response = await denyAccessRequest(request.id, token, ''); // Empty reason since we're removing the modal
       
       // Open email client with pre-drafted denial email
       if (response.email_template) {
@@ -119,11 +114,6 @@ export default function AccessRequestsPage() {
         });
       }
       
-      // Reset dialog state
-      setDenyDialogOpen(false);
-      setSelectedRequest(null);
-      setDenyReason('');
-      
       // Refresh the list
       await fetchRequests();
     } catch (error) {
@@ -135,11 +125,6 @@ export default function AccessRequestsPage() {
     } finally {
       setProcessingId(null);
     }
-  };
-
-  const openDenyDialog = (request: AccessRequest) => {
-    setSelectedRequest(request);
-    setDenyDialogOpen(true);
   };
 
   const getStatusBadge = (status: string) => {
@@ -253,11 +238,11 @@ export default function AccessRequestsPage() {
                         {processingId === request.id ? 'Approving...' : 'Approve'}
                       </Button>
                       <Button
-                        onClick={() => openDenyDialog(request)}
+                        onClick={() => handleDeny(request)}
                         disabled={processingId === request.id}
                         variant="destructive"
                       >
-                        Deny
+                        {processingId === request.id ? 'Denying...' : 'Deny'}
                       </Button>
                     </div>
                   )}
@@ -271,41 +256,6 @@ export default function AccessRequestsPage() {
         </div>
       )}
 
-      <Dialog open={denyDialogOpen} onOpenChange={setDenyDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Deny Access Request</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to deny access for {selectedRequest?.full_name}? 
-              You can optionally provide a reason below.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="deny-reason">Reason for denial (optional)</Label>
-              <Textarea
-                id="deny-reason"
-                placeholder="Provide a reason for denying this request..."
-                value={denyReason}
-                onChange={(e) => setDenyReason(e.target.value)}
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDenyDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleDeny}
-              disabled={processingId === selectedRequest?.id}
-            >
-              {processingId === selectedRequest?.id ? 'Denying...' : 'Deny Request'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
     </div>
   );

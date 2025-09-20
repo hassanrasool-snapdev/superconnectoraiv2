@@ -10,7 +10,7 @@ import io
 from app.services.auth_service import get_current_user
 from app.services import warm_intro_requests_service
 from app.models.warm_intro_request import WarmIntroStatus
-from app.services.follow_up_email_service import schedule_follow_up_email, record_user_response
+from app.services.follow_up_email_service import schedule_follow_up_email
 from app.core.db import get_database
 
 router = APIRouter()
@@ -27,9 +27,8 @@ class WarmIntroRequestUpdate(BaseModel):
     connected_date: Optional[datetime] = None
     declined_date: Optional[datetime] = None
     outcome: Optional[str] = None
+    outcome_date: Optional[datetime] = None
 
-class FollowUpResponse(BaseModel):
-    connected: bool
 
 class WarmIntroRequestResponse(BaseModel):
     id: str
@@ -46,6 +45,7 @@ class WarmIntroRequestResponse(BaseModel):
     connected_date: Optional[str] = None
     declined_date: Optional[str] = None
     outcome: Optional[str] = None
+    outcome_date: Optional[str] = None
 
 class PaginatedWarmIntroRequestsResponse(BaseModel):
     items: List[WarmIntroRequestResponse]
@@ -90,7 +90,8 @@ async def create_warm_intro_request(
             user_id=str(warm_intro_request.user_id),
             connected_date=warm_intro_request.connected_date.isoformat() if warm_intro_request.connected_date else None,
             declined_date=warm_intro_request.declined_date.isoformat() if warm_intro_request.declined_date else None,
-            outcome=warm_intro_request.outcome
+            outcome=warm_intro_request.outcome,
+            outcome_date=warm_intro_request.outcome_date.isoformat() if warm_intro_request.outcome_date else None
         )
     except Exception as e:
         raise HTTPException(
@@ -137,7 +138,8 @@ async def get_warm_intro_requests(
                 user_id=str(req.user_id),
                 connected_date=req.connected_date.isoformat() if req.connected_date else None,
                 declined_date=req.declined_date.isoformat() if req.declined_date else None,
-                outcome=req.outcome
+                outcome=req.outcome,
+                outcome_date=req.outcome_date.isoformat() if req.outcome_date else None
             )
             for req in result["items"]
         ]
@@ -202,7 +204,8 @@ async def get_warm_intro_request_by_id(
             user_id=str(warm_intro_request.user_id),
             connected_date=warm_intro_request.connected_date.isoformat() if warm_intro_request.connected_date else None,
             declined_date=warm_intro_request.declined_date.isoformat() if warm_intro_request.declined_date else None,
-            outcome=warm_intro_request.outcome
+            outcome=warm_intro_request.outcome,
+            outcome_date=warm_intro_request.outcome_date.isoformat() if warm_intro_request.outcome_date else None
         )
     except HTTPException:
         raise
@@ -254,7 +257,9 @@ async def update_warm_intro_request_status(
             status=request.status,
             user_id=user_id,
             connected_date=request.connected_date,
-            declined_date=request.declined_date
+            declined_date=request.declined_date,
+            outcome=request.outcome,
+            outcome_date=request.outcome_date
         )
         
         if not updated_request:
@@ -293,7 +298,8 @@ async def update_warm_intro_request_status(
             user_id=str(updated_request.user_id),
             connected_date=updated_request.connected_date.isoformat() if updated_request.connected_date else None,
             declined_date=updated_request.declined_date.isoformat() if updated_request.declined_date else None,
-            outcome=updated_request.outcome
+            outcome=updated_request.outcome,
+            outcome_date=updated_request.outcome_date.isoformat() if updated_request.outcome_date else None
         )
     except HTTPException:
         raise
@@ -401,40 +407,3 @@ async def export_connected_requests_csv(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to export connected requests: {str(e)}"
         )
-
-@router.post("/warm-intro-requests/{request_id}/respond")
-async def respond_to_follow_up(
-    request_id: str,
-    response: FollowUpResponse,
-    db = Depends(get_database)
-):
-    """
-    Record user response to a follow-up email.
-    
-    This endpoint is called when a user clicks on the "Yes" or "No" links in the follow-up email.
-    It does not require authentication since it's accessed via email links.
-    """
-    try:
-        success = await record_user_response(
-            db=db,
-            request_id=request_id,
-            connected=response.connected
-        )
-        
-        if success:
-            return {
-                "message": "Thank you for your response!",
-                "connected": response.connected
-            }
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Warm intro request not found or already responded to"
-            )
-            
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to record response: {str(e)}"
-        )
-        

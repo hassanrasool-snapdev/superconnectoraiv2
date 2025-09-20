@@ -96,10 +96,12 @@ export async function updateWarmIntroRequestStatus(
     status: WarmIntroStatus,
     token: string,
     connectedDate?: string,
-    declinedDate?: string
+    declinedDate?: string,
+    outcome?: string | null,
+    outcomeDate?: string | null
 ): Promise<WarmIntroRequest> {
     try {
-        const body: { status: WarmIntroStatus; connected_date?: string; declined_date?: string } = { status };
+        const body: { status: WarmIntroStatus; connected_date?: string; declined_date?: string; outcome?: string | null; outcome_date?: string | null } = { status };
         
         if (connectedDate) {
             body.connected_date = connectedDate;
@@ -107,6 +109,14 @@ export async function updateWarmIntroRequestStatus(
         
         if (declinedDate) {
             body.declined_date = declinedDate;
+        }
+        
+        if (outcome !== undefined) {
+            body.outcome = outcome;
+        }
+        
+        if (outcomeDate !== undefined) {
+            body.outcome_date = outcomeDate;
         }
 
         const response = await fetch(`${API_BASE_URL}/warm-intro-requests/${requestId}/status`, {

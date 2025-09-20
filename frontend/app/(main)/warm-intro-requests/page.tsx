@@ -195,7 +195,7 @@ export default function WarmIntroRequestsPage() {
       
       toast({
         title: "Status updated",
-        description: `Request status changed to ${newStatus}`,
+        description: `Request status changed to ${newStatus === WarmIntroStatus.connected ? 'Approved' : newStatus}`,
       });
     } catch (err: unknown) {
       // Track failed status update
@@ -215,6 +215,50 @@ export default function WarmIntroRequestsPage() {
     }
   };
 
+  const handleOutcomeUpdate = async (requestId: string, outcome: string | null) => {
+    if (!token) return;
+    
+    const request = requests.find(r => r.id === requestId);
+    const startTime = Date.now();
+    
+    setUpdatingStatus(requestId);
+    try {
+      // Use the existing status update endpoint but only update the outcome
+      const outcomeDate = outcome ? new Date().toISOString() : null;
+      await updateWarmIntroRequestStatus(requestId, request!.status, token,
+        request!.connected_date || undefined,
+        request!.declined_date || undefined,
+        outcome,
+        outcomeDate
+      );
+      
+      // Optimistically update the local state
+      setRequests(prev => prev.map(req =>
+        req.id === requestId
+          ? {
+              ...req,
+              outcome: outcome,
+              outcome_date: outcomeDate,
+              updated_at: new Date().toISOString()
+            }
+          : req
+      ));
+      
+      toast({
+        title: "Outcome updated",
+        description: `Connection outcome set to ${outcome || 'reset'}`,
+      });
+    } catch (err: unknown) {
+      toast({
+        title: "Error",
+        description: "Failed to update outcome",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
   const handleStatusButtonClick = (requestId: string, newStatus: WarmIntroStatus) => {
     if (newStatus === WarmIntroStatus.connected || newStatus === WarmIntroStatus.declined) {
       // Show date picker modal
@@ -222,8 +266,8 @@ export default function WarmIntroRequestsPage() {
         isOpen: true,
         requestId,
         status: newStatus,
-        title: `Set ${newStatus === WarmIntroStatus.connected ? 'Connected' : 'Declined'} Date`,
-        description: `Please select the date when this request was ${newStatus === WarmIntroStatus.connected ? 'connected' : 'declined'}.`
+        title: `Set ${newStatus === WarmIntroStatus.connected ? 'Approved' : 'Declined'} Date`,
+        description: `Please select the date when this request was ${newStatus === WarmIntroStatus.connected ? 'approved' : 'declined'}.`
       });
     } else {
       // For pending status, update directly without date
@@ -428,7 +472,7 @@ export default function WarmIntroRequestsPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Connected</CardDescription>
+            <CardDescription>Approved</CardDescription>
             <CardTitle className="text-2xl text-green-600">
               {requests.filter(r => r.status === WarmIntroStatus.connected).length}
             </CardTitle>
@@ -455,7 +499,7 @@ export default function WarmIntroRequestsPage() {
                 <SelectContent>
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value={WarmIntroStatus.pending}>Pending</SelectItem>
-                  <SelectItem value={WarmIntroStatus.connected}>Connected</SelectItem>
+                  <SelectItem value={WarmIntroStatus.connected}>Approved</SelectItem>
                   <SelectItem value={WarmIntroStatus.declined}>Declined</SelectItem>
                 </SelectContent>
               </Select>
@@ -474,10 +518,10 @@ export default function WarmIntroRequestsPage() {
                   <TableHead>Requester</TableHead>
                   <TableHead>Connection</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>14 Day Outcome</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Updated</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead>Request approved?</TableHead>
+                  <TableHead>14 Day Outcome</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -503,9 +547,6 @@ export default function WarmIntroRequestsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-gray-600">
-                        {get14DayOutcome(request)}
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-600">
                         {new Date(request.created_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="text-sm text-gray-600">
@@ -522,7 +563,7 @@ export default function WarmIntroRequestsPage() {
                                 disabled={updatingStatus === request.id}
                                 className="text-green-600 border-green-200 hover:bg-green-50"
                               >
-                                Connected
+                                Approved
                               </Button>
                               <Button
                                 variant="outline"
@@ -540,7 +581,7 @@ export default function WarmIntroRequestsPage() {
                               {/* Show date if available */}
                               {request.status === WarmIntroStatus.connected && request.connected_date && (
                                 <div className="text-xs text-green-600 font-medium">
-                                  Connected: {new Date(request.connected_date).toLocaleDateString()}
+                                  Approved: {new Date(request.connected_date).toLocaleDateString()}
                                 </div>
                               )}
                               {request.status === WarmIntroStatus.declined && request.declined_date && (
@@ -558,6 +599,52 @@ export default function WarmIntroRequestsPage() {
                                 Reset
                               </Button>
                             </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {request.outcome ? (
+                            <div className="flex flex-col gap-2">
+                              {request.outcome_date && (
+                                <div className={cn(
+                                  "text-xs font-medium",
+                                  request.outcome === "Connected" ? "text-green-600" : "text-red-600"
+                                )}>
+                                  {request.outcome === "Connected" ? "Connected" : "Not Connected"}: {new Date(request.outcome_date).toLocaleDateString()}
+                                </div>
+                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOutcomeUpdate(request.id, null)}
+                                disabled={updatingStatus === request.id}
+                                className="text-yellow-600 border-yellow-200 hover:bg-yellow-50"
+                              >
+                                Reset
+                              </Button>
+                            </div>
+                          ) : (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOutcomeUpdate(request.id, "Connected")}
+                                disabled={updatingStatus === request.id}
+                                className="text-green-600 border-green-200 hover:bg-green-50"
+                              >
+                                Connected
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOutcomeUpdate(request.id, "Not Connected")}
+                                disabled={updatingStatus === request.id}
+                                className="text-red-600 border-red-200 hover:bg-red-50"
+                              >
+                                Not Connected
+                              </Button>
+                            </>
                           )}
                         </div>
                       </TableCell>

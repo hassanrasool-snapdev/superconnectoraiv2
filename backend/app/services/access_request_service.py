@@ -2,7 +2,7 @@ from fastapi import HTTPException, status
 from datetime import datetime
 from uuid import UUID
 from app.models.access_request import AccessRequestCreate, AccessRequestInDB, AccessRequestUpdate, AccessRequestStatus
-from app.services.follow_up_email_service import send_email_via_sendgrid
+# SendGrid integration removed - using manual email templates now
 import os
 
 async def create_access_request(db, request_data: AccessRequestCreate):

@@ -185,8 +185,6 @@ class TestGenerateAutomatedFollowUpContent:
             
             content = generate_automated_follow_up_content("John", "Jane", request_id)
             
-            expected_yes_link = f"http://localhost:3000/warm-intro-response?request_id={request_id}&response=yes"
-            expected_no_link = f"http://localhost:3000/warm-intro-response?request_id={request_id}&response=no"
             expected_donate_link = "http://localhost:3000/donate"
             
             assert expected_yes_link in content

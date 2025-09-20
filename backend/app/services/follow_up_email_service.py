@@ -4,8 +4,6 @@ from typing import List, Optional
 import asyncio
 import logging
 from uuid import UUID
-import sendgrid
-from sendgrid.helpers.mail import Mail, Email, To, Content
 from app.models.follow_up_email import (
     FollowUpEmailCreate,
     FollowUpEmailInDB,
@@ -250,84 +248,90 @@ async def get_follow_up_stats(db) -> dict:
 # New functions for automated follow-up emails based on warm intro requests
 
 async def get_eligible_warm_intro_requests(db) -> List[dict]:
-    """Get warm intro requests that are eligible for follow-up emails (older than 14 days, no follow-up sent yet)"""
+    """Get warm intro requests that are eligible for follow-up emails (older than 14 days, no follow-up sent yet, not skipped)"""
     cutoff_date = datetime.utcnow() - timedelta(days=14)
     
     cursor = db.warm_intro_requests.find({
         "created_at": {"$lte": cutoff_date},
         "follow_up_sent_date": None,
+        "follow_up_skipped": {"$ne": True},
         "status": WarmIntroStatus.pending.value
     })
     
     return await cursor.to_list(length=None)
 
-async def send_automated_follow_up_email(db, warm_intro_request: dict) -> bool:
-    """Send an automated follow-up email for a warm intro request"""
+async def prepare_manual_follow_up_email(db, warm_intro_request: dict) -> dict:
+    """Prepare manual follow-up email data for a warm intro request"""
     try:
-        # Get user email
-        user = await db.users.find_one({"id": warm_intro_request["user_id"]})
+        # Handle both field naming conventions
+        request_id = warm_intro_request.get("id") or warm_intro_request.get("_id")
+        user_id = warm_intro_request.get("user_id") or warm_intro_request.get("requester_id")
+        
+        if not request_id:
+            logger.error(f"No valid request ID found in warm intro request: {warm_intro_request}")
+            return {"success": False, "error": "Invalid request ID"}
+            
+        if not user_id:
+            logger.error(f"No valid user ID found in warm intro request {request_id}")
+            return {"success": False, "error": "Invalid user ID"}
+        
+        # Get user email - handle both _id and id field naming
+        user = await db.users.find_one({"$or": [{"_id": user_id}, {"id": user_id}]})
         if not user:
-            logger.error(f"User not found for warm intro request {warm_intro_request['id']}")
-            return False
+            logger.error(f"User not found for warm intro request {request_id}")
+            return {"success": False, "error": "User not found"}
         
         user_email = user["email"]
         
         # Generate email content
         email_content = generate_automated_follow_up_content(
             warm_intro_request["requester_name"],
-            warm_intro_request["connection_name"],
-            warm_intro_request["id"]
+            warm_intro_request.get("connection_name") or warm_intro_request.get("target_name"),
+            request_id
         )
         
-        # Send email
-        success = await send_email_via_sendgrid(
-            to_email=user_email,
-            subject="Following up on your introduction request",
-            html_content=email_content
-        )
-        
-        if success:
-            # Update the warm intro request with follow-up sent date
-            await db.warm_intro_requests.update_one(
-                {"id": warm_intro_request["id"]},
-                {
-                    "$set": {
-                        "follow_up_sent_date": datetime.utcnow(),
-                        "updated_at": datetime.utcnow()
-                    }
+        # Mark as follow-up prepared (but not sent automatically)
+        update_query = {"$or": [{"_id": request_id}, {"id": request_id}]}
+        await db.warm_intro_requests.update_one(
+            update_query,
+            {
+                "$set": {
+                    "follow_up_prepared_date": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
                 }
-            )
-            
-            logger.info(f"Automated follow-up email sent for warm intro request {warm_intro_request['id']}")
-            return True
-        else:
-            logger.error(f"Failed to send automated follow-up email for warm intro request {warm_intro_request['id']}")
-            return False
+            }
+        )
+        
+        logger.info(f"Manual follow-up email prepared for warm intro request {request_id}")
+        
+        return {
+            "success": True,
+            "request_id": request_id,
+            "to_email": user_email,
+            "subject": "Following up on your introduction request",
+            "html_content": email_content,
+            "requester_name": warm_intro_request["requester_name"],
+            "connection_name": warm_intro_request.get("connection_name") or warm_intro_request.get("target_name")
+        }
             
     except Exception as e:
-        logger.error(f"Error sending automated follow-up email for warm intro request {warm_intro_request['id']}: {str(e)}")
-        return False
+        request_id = warm_intro_request.get("id") or warm_intro_request.get("_id", "unknown")
+        logger.error(f"Error preparing manual follow-up email for warm intro request {request_id}: {str(e)}")
+        return {"success": False, "error": str(e)}
 
 def generate_automated_follow_up_content(requester_name: str, connection_name: str, request_id: str) -> str:
     """Generate the automated follow-up email content"""
-    yes_link = f"{settings.FRONTEND_URL}/warm-intro-response?request_id={request_id}&response=yes"
-    no_link = f"{settings.FRONTEND_URL}/warm-intro-response?request_id={request_id}&response=no"
     donate_link = f"{settings.FRONTEND_URL}/donate"
     
     return f"""
     <html>
     <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
         <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #2c3e50;">Following up on your introduction request</h2>
-            
             <p>Hi there,</p>
             
             <p>Just checking in on your warm intro request to connect with <strong>{connection_name}</strong>. Were you able to connect?</p>
             
-            <div style="margin: 30px 0; text-align: center;">
-                <a href="{yes_link}" style="background-color: #27ae60; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin-right: 10px; display: inline-block;">Yes, we connected</a>
-                <a href="{no_link}" style="background-color: #e74c3c; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">No, not yet</a>
-            </div>
+            <p>Please reply to this email to let us know how the connection went. Your feedback helps us improve our service and track the success of our warm introductions.</p>
             
             <p>If you need any further support with your networking goals, please don't hesitate to reach out.</p>
             
@@ -350,168 +354,38 @@ def generate_automated_follow_up_content(requester_name: str, connection_name: s
     </html>
     """
 
-async def send_email_via_sendgrid(to_email: str, subject: str, html_content: str, max_retries: int = 3) -> bool:
-    """Send email using SendGrid API with retry logic"""
-    
-    if not settings.SENDGRID_API_KEY:
-        logger.warning("SendGrid API key not configured, simulating email send")
-        return await simulate_email_send(to_email, subject, html_content)
-    
-    for attempt in range(max_retries):
-        try:
-            sg = sendgrid.SendGridAPIClient(api_key=settings.SENDGRID_API_KEY)
-            
-            from_email = Email(settings.FROM_EMAIL, settings.FROM_NAME)
-            to_email_obj = To(to_email)
-            content = Content("text/html", html_content)
-            
-            mail = Mail(from_email, to_email_obj, subject, content)
-            
-            response = sg.client.mail.send.post(request_body=mail.get())
-            
-            if response.status_code in [200, 201, 202]:
-                logger.info(f"Email sent successfully to {to_email} on attempt {attempt + 1}")
-                return True
-            elif response.status_code == 429:  # Rate limit
-                wait_time = (2 ** attempt) + random.uniform(0, 1)  # Exponential backoff with jitter
-                logger.warning(f"Rate limited sending email to {to_email}, waiting {wait_time:.2f}s before retry {attempt + 1}/{max_retries}")
-                await asyncio.sleep(wait_time)
-                continue
-            else:
-                logger.error(f"Failed to send email to {to_email}. Status code: {response.status_code}, Response: {response.body}")
-                if attempt == max_retries - 1:  # Last attempt
-                    return False
-                await asyncio.sleep(1)  # Brief pause before retry
-                
-        except Exception as e:
-            logger.error(f"Error sending email via SendGrid to {to_email} (attempt {attempt + 1}/{max_retries}): {str(e)}")
-            if attempt == max_retries - 1:  # Last attempt
-                return False
-            
-            # Exponential backoff for retries
-            wait_time = (2 ** attempt) + random.uniform(0, 1)
-            await asyncio.sleep(wait_time)
-    
-    return False
+# SendGrid integration removed - now using manual email templates
+# Email templates are generated and displayed to users for manual sending
 
-async def process_automated_follow_ups() -> int:
-    """Process all eligible warm intro requests for automated follow-up emails"""
+async def process_manual_follow_ups() -> int:
+    """Process all eligible warm intro requests for manual follow-up email preparation"""
     try:
         db = get_database()
         eligible_requests = await get_eligible_warm_intro_requests(db)
         
-        logger.info(f"Processing {len(eligible_requests)} eligible warm intro requests for follow-up")
+        logger.info(f"Processing {len(eligible_requests)} eligible warm intro requests for manual follow-up preparation")
         
-        sent_count = 0
+        prepared_count = 0
         failed_count = 0
         
-        # Process requests in batches to avoid overwhelming the email service
-        batch_size = 10
-        for i in range(0, len(eligible_requests), batch_size):
-            batch = eligible_requests[i:i + batch_size]
-            
-            # Process batch with some delay between emails
-            for request in batch:
-                try:
-                    success = await send_automated_follow_up_email(db, request)
-                    if success:
-                        sent_count += 1
-                        logger.info(f"Successfully sent follow-up email for request {request['id']}")
-                    else:
-                        failed_count += 1
-                        logger.warning(f"Failed to send follow-up email for request {request['id']}")
-                    
-                    # Small delay between emails to be respectful to email service
-                    await asyncio.sleep(0.5)
-                    
-                except Exception as e:
+        # Process requests to prepare manual email templates
+        for request in eligible_requests:
+            try:
+                result = await prepare_manual_follow_up_email(db, request)
+                if result["success"]:
+                    prepared_count += 1
+                    logger.info(f"Successfully prepared follow-up email for request {request['id']}")
+                else:
                     failed_count += 1
-                    logger.error(f"Error processing follow-up for request {request['id']}: {str(e)}")
-            
-            # Longer delay between batches
-            if i + batch_size < len(eligible_requests):
-                logger.info(f"Processed batch {i//batch_size + 1}, waiting before next batch...")
-                await asyncio.sleep(2)
+                    logger.warning(f"Failed to prepare follow-up email for request {request['id']}: {result.get('error', 'Unknown error')}")
+                    
+            except Exception as e:
+                failed_count += 1
+                logger.error(f"Error processing follow-up for request {request['id']}: {str(e)}")
         
-        logger.info(f"Follow-up processing complete: {sent_count} sent, {failed_count} failed")
-        return sent_count
+        logger.info(f"Manual follow-up processing complete: {prepared_count} prepared, {failed_count} failed")
+        return prepared_count
         
     except Exception as e:
-        logger.error(f"Error processing automated follow-ups: {str(e)}")
+        logger.error(f"Error processing manual follow-ups: {str(e)}")
         return 0
-
-async def record_user_response(db, request_id: str, connected: bool) -> dict:
-    """Record user response to follow-up email with enhanced validation"""
-    try:
-        # First, check if the request exists and hasn't already been responded to
-        existing_request = await db.warm_intro_requests.find_one({"id": request_id})
-        
-        if not existing_request:
-            logger.warning(f"Warm intro request {request_id} not found")
-            return {"success": False, "error": "request_not_found", "message": "Warm intro request not found"}
-        
-        # Check if user has already responded
-        if existing_request.get("user_responded", False):
-            logger.info(f"User has already responded to request {request_id}")
-            return {
-                "success": False,
-                "error": "already_responded",
-                "message": "You have already responded to this follow-up email",
-                "previous_response": {
-                    "connected": existing_request.get("status") == WarmIntroStatus.connected.value,
-                    "response_date": existing_request.get("response_date")
-                }
-            }
-        
-        update_data = {
-            "user_responded": True,
-            "response_date": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
-        }
-        
-        if connected:
-            update_data["status"] = WarmIntroStatus.connected.value
-            update_data["connected_date"] = datetime.utcnow()
-        else:
-            # If they said no, we might want to keep status as pending
-            # or create a new status for "no connection yet"
-            pass
-        
-        result = await db.warm_intro_requests.update_one(
-            {"id": request_id, "user_responded": {"$ne": True}},  # Only update if not already responded
-            {"$set": update_data}
-        )
-        
-        if result.modified_count > 0:
-            logger.info(f"Recorded user response for warm intro request {request_id}: connected={connected}")
-            
-            # Log analytics data for tracking
-            await log_follow_up_response(db, request_id, connected)
-            
-            return {"success": True, "message": "Response recorded successfully", "connected": connected}
-        else:
-            logger.warning(f"Warm intro request {request_id} not found or user already responded")
-            return {"success": False, "error": "update_failed", "message": "Failed to update request - it may have been already responded to"}
-            
-    except Exception as e:
-        logger.error(f"Error recording user response for request {request_id}: {str(e)}")
-        return {"success": False, "error": "internal_error", "message": f"Internal server error: {str(e)}"}
-
-async def log_follow_up_response(db, request_id: str, connected: bool):
-    """Log follow-up response for analytics"""
-    try:
-        analytics_data = {
-            "event_type": "follow_up_response",
-            "request_id": request_id,
-            "connected": connected,
-            "timestamp": datetime.utcnow(),
-            "source": "email_follow_up"
-        }
-        
-        # Insert into analytics collection (create if doesn't exist)
-        await db.follow_up_analytics.insert_one(analytics_data)
-        logger.debug(f"Logged follow-up response analytics for request {request_id}")
-        
-    except Exception as e:
-        logger.error(f"Error logging follow-up response analytics: {str(e)}")
-        # Don't fail the main operation if analytics logging fails

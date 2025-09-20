@@ -2,7 +2,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
-from app.services.follow_up_email_service import process_pending_follow_ups, process_automated_follow_ups
+from app.services.follow_up_email_service import process_pending_follow_ups, process_manual_follow_ups
 from app.core.db import get_database
 import traceback
 
@@ -55,8 +55,8 @@ class SchedulerService:
                 # Process pending follow-up emails (legacy system)
                 await self._process_follow_up_emails()
                 
-                # Process automated follow-up emails for warm intro requests
-                await self._process_automated_follow_ups()
+                # Manual follow-up emails are now handled via UI - no automated processing
+                logger.info("Manual follow-up email system active - no automated processing needed")
                 
                 # Reset error counter on successful cycle
                 consecutive_errors = 0

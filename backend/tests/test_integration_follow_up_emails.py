@@ -184,9 +184,7 @@ class TestFollowUpEmailIntegration:
             
             content = generate_automated_follow_up_content(requester_name, connection_name, request_id)
             
-            # Verify that the generated links would work with our API
-            expected_yes_link = f"http://localhost:3000/warm-intro-response?request_id={request_id}&response=yes"
-            expected_no_link = f"http://localhost:3000/warm-intro-response?request_id={request_id}&response=no"
+            # Verify that the generated content includes donation link
             
             assert expected_yes_link in content
             assert expected_no_link in content

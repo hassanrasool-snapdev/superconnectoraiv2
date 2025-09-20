@@ -168,9 +168,7 @@ class TestFollowUpEmailE2E:
             
             content = generate_automated_follow_up_content("John Doe", "Jane Smith", request_id)
             
-            # Extract the generated links
-            expected_yes_link = f"http://localhost:3000/warm-intro-response?request_id={request_id}&response=yes"
-            expected_no_link = f"http://localhost:3000/warm-intro-response?request_id={request_id}&response=no"
+            # Extract the generated donation link
             expected_donate_link = "http://localhost:3000/donate"
             
             assert expected_yes_link in content

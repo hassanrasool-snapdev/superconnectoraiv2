@@ -142,6 +142,7 @@ export interface WarmIntroRequest {
   connection_last_name?: string | null;
   status: WarmIntroStatus;
   outcome?: string | null;
+  outcome_date?: string | null;
   created_at: string;
   updated_at: string;
   connected_date?: string | null;

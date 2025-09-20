@@ -120,7 +120,9 @@ async def update_warm_intro_request_status(
     status: WarmIntroStatus,
     user_id: UUID,
     connected_date: Optional[datetime] = None,
-    declined_date: Optional[datetime] = None
+    declined_date: Optional[datetime] = None,
+    outcome: Optional[str] = None,
+    outcome_date: Optional[datetime] = None
 ) -> Optional[WarmIntroRequest]:
     """
     Update the status of a warm intro request.
@@ -132,6 +134,8 @@ async def update_warm_intro_request_status(
         user_id: ID of the user (for security)
         connected_date: Date when connected (if status is connected)
         declined_date: Date when declined (if status is declined)
+        outcome: Connection outcome (Connected, Not Connected, or None to clear)
+        outcome_date: Date when outcome was set
     
     Returns:
         WarmIntroRequest or None: The updated request if successful
@@ -141,6 +145,14 @@ async def update_warm_intro_request_status(
         "status": status.value,
         "updated_at": datetime.utcnow()
     }
+    
+    # Add outcome field if provided
+    if outcome is not None:
+        update_doc["outcome"] = outcome
+        
+    # Add outcome_date field if provided
+    if outcome_date is not None:
+        update_doc["outcome_date"] = outcome_date
     
     # Add date fields based on status
     if status == WarmIntroStatus.connected and connected_date:
