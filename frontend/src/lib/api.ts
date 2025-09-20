@@ -723,10 +723,8 @@ export async function exportConnectedRequestsCSV(token: string): Promise<Blob> {
 }
 
 export async function getFilterOptions(token: string): Promise<{
-  industries: string[];
-  company_sizes: string[];
-  locations: string[];
-  professional_status_counts: Record<string, number>;
+  countries: string[];
+  open_to_work_count: number;
   total_connections: number;
   generated_from: string;
 }> {

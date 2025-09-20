@@ -17,23 +17,9 @@ from app.core.db import get_database
 router = APIRouter()
 
 class SearchFilters(BaseModel):
-    industries: Optional[List[str]] = None
-    company_sizes: Optional[List[str]] = None
-    locations: Optional[List[str]] = None
-    date_range_start: Optional[str] = None
-    date_range_end: Optional[str] = None
-    min_followers: Optional[int] = None
-    max_followers: Optional[int] = None
-    # Employment status - mutually exclusive
-    hiring_status: Optional[str] = None  # "hiring" or "open_to_work"
-    # Individual boolean filters for employment status
-    is_hiring: Optional[bool] = None
-    is_open_to_work: Optional[bool] = None
-    # Role types - can be combined with employment status
-    is_company_owner: Optional[bool] = None
-    has_pe_vc_role: Optional[bool] = None
-    employment_status: Optional[str] = None  # "current" or "past"
-    geo_location: Optional[str] = None
+    # Streamlined filters - only Open to Work and Country
+    open_to_work: Optional[bool] = None
+    country: Optional[str] = None
 
 class SearchRequest(BaseModel):
     query: str
@@ -295,114 +281,35 @@ async def ai_search_connections_progress(
     return StreamingResponse(progress_generator(), media_type="text/event-stream")
 
 def convert_search_filters_to_pinecone_filter(filters: SearchFilters) -> dict:
-    """Convert SearchFilters to Pinecone metadata filter format"""
+    """Convert streamlined SearchFilters to Pinecone metadata filter format"""
     filter_dict = {}
     
-    if filters.industries:
-        filter_dict["company_industry"] = {"$in": filters.industries}
+    # Open to Work filter
+    if filters.open_to_work is not None:
+        filter_dict["is_open_to_work"] = {"$eq": filters.open_to_work}
     
-    if filters.company_sizes:
-        filter_dict["company_size"] = {"$in": filters.company_sizes}
-    
-    if filters.locations:
-        # For locations, we might need to check city, state, or country
-        location_conditions = []
-        for location in filters.locations:
-            location_conditions.extend([
-                {"city": {"$eq": location}},
-                {"state": {"$eq": location}},
-                {"country": {"$eq": location}}
-            ])
-        if location_conditions:
-            filter_dict["$or"] = location_conditions
-    
-    # Employment status filter - mutually exclusive (legacy support)
-    if filters.hiring_status:
-        if filters.hiring_status == "hiring":
-            filter_dict["is_hiring"] = {"$eq": True}
-        elif filters.hiring_status == "open_to_work":
-            filter_dict["is_open_to_work"] = {"$eq": True}
-    
-    # Individual boolean filters for employment status
-    if filters.is_hiring is not None:
-        filter_dict["is_hiring"] = {"$eq": filters.is_hiring}
-    
-    if filters.is_open_to_work is not None:
-        filter_dict["is_open_to_work"] = {"$eq": filters.is_open_to_work}
-    
-    # Role type filters - can be combined
-    if filters.is_company_owner is not None:
-        filter_dict["is_company_owner"] = {"$eq": filters.is_company_owner}
-    
-    if filters.has_pe_vc_role is not None:
-        filter_dict["has_pe_vc_role"] = {"$eq": filters.has_pe_vc_role}
-    
-    if filters.geo_location:
-        filter_dict["geo_location"] = {"$eq": filters.geo_location}
-    
-    # Note: Date range and follower filters would need to be handled differently
-    # in Pinecone as they require numeric comparisons
+    # Country filter
+    if filters.country:
+        filter_dict["country"] = {"$eq": filters.country}
     
     return filter_dict if filter_dict else None
 
 def apply_search_filters(connections: List[dict], filters: SearchFilters) -> List[dict]:
-    """Apply advanced filters to connection list"""
+    """Apply streamlined filters to connection list"""
     filtered_connections = connections
     
-    # Filter by industries
-    if filters.industries:
+    # Filter by Open to Work status
+    if filters.open_to_work is not None:
         filtered_connections = [
             conn for conn in filtered_connections
-            if conn.get('company_industry') and any(
-                industry.lower() in conn.get('company_industry', '').lower()
-                for industry in filters.industries
-            )
+            if conn.get('is_open_to_work') == filters.open_to_work or conn.get('isOpenToWork') == filters.open_to_work
         ]
     
-    # Filter by company sizes
-    if filters.company_sizes:
+    # Filter by Country
+    if filters.country:
         filtered_connections = [
             conn for conn in filtered_connections
-            if conn.get('company_size') and conn.get('company_size') in filters.company_sizes
-        ]
-    
-    # Filter by locations
-    if filters.locations:
-        filtered_connections = [
-            conn for conn in filtered_connections
-            if conn.get('city') and any(
-                location.lower() in conn.get('city', '').lower() or
-                location.lower() in conn.get('state', '').lower() or
-                location.lower() in conn.get('country', '').lower()
-                for location in filters.locations
-            )
-        ]
-    
-    # Filter by individual boolean filters
-    if filters.is_hiring is not None:
-        filtered_connections = [
-            conn for conn in filtered_connections
-            if conn.get('is_hiring') == filters.is_hiring or conn.get('isHiring') == filters.is_hiring
-        ]
-    
-    if filters.is_open_to_work is not None:
-        filtered_connections = [
-            conn for conn in filtered_connections
-            if conn.get('is_open_to_work') == filters.is_open_to_work or conn.get('isOpenToWork') == filters.is_open_to_work
-        ]
-    
-    # Filter by connection date range
-    if filters.date_range_start or filters.date_range_end:
-        filtered_connections = [
-            conn for conn in filtered_connections
-            if is_connection_in_date_range(conn, filters.date_range_start, filters.date_range_end)
-        ]
-    
-    # Filter by follower count
-    if filters.min_followers is not None or filters.max_followers is not None:
-        filtered_connections = [
-            conn for conn in filtered_connections
-            if is_follower_count_in_range(conn, filters.min_followers, filters.max_followers)
+            if conn.get('country') and conn.get('country').lower() == filters.country.lower()
         ]
     
     return filtered_connections

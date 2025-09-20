@@ -561,16 +561,40 @@ Example format:
                         # Handle boolean filters
                         if "$and" not in mongo_query:
                             mongo_query["$and"] = []
-                        # Convert field names to match MongoDB schema
-                        field_name = key
-                        if key == "is_open_to_work":
-                            field_name = "isOpenToWork"
-                        elif key == "is_hiring":
-                            field_name = "isHiring"
-                        elif key == "is_company_owner":
-                            field_name = "is_company_owner"
                         
-                        mongo_query["$and"].append({field_name: value})
+                        # Handle multiple field name variations for each boolean filter
+                        if key == "is_open_to_work":
+                            # Check both snake_case and camelCase variants
+                            mongo_query["$and"].append({
+                                "$or": [
+                                    {"is_open_to_work": value},
+                                    {"isOpenToWork": value}
+                                ]
+                            })
+                        elif key == "is_hiring":
+                            # Check both snake_case and camelCase variants
+                            mongo_query["$and"].append({
+                                "$or": [
+                                    {"is_hiring": value},
+                                    {"isHiring": value}
+                                ]
+                            })
+                        elif key == "is_company_owner":
+                            # Check both snake_case and camelCase variants
+                            mongo_query["$and"].append({
+                                "$or": [
+                                    {"is_company_owner": value},
+                                    {"isCompanyOwner": value}
+                                ]
+                            })
+                        elif key == "has_pe_vc_role":
+                            # Check both snake_case and camelCase variants
+                            mongo_query["$and"].append({
+                                "$or": [
+                                    {"has_pe_vc_role": value},
+                                    {"hasPeVcRole": value}
+                                ]
+                            })
                     else:
                         # Handle other filters directly
                         mongo_query[key] = value

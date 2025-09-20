@@ -8,7 +8,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Button } from '../../../src/components/ui/button';
 import { Label } from "../../../src/components/ui/label";
 import WarmIntroModal from '@/components/shared/WarmIntroModal';
-import PremiumBadge from '@/components/shared/PremiumBadge';
 
 export default function ConnectionsPage() {
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -91,7 +90,6 @@ export default function ConnectionsPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span>{conn.first_name} {conn.last_name}</span>
-                        <PremiumBadge isPremium={!!conn.is_premium} size="sm" variant="compact" />
                       </div>
                       {conn.email_address && (
                         <div className="text-xs text-gray-500">{conn.email_address}</div>
