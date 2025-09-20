@@ -17,7 +17,6 @@ import EnhancedWarmIntroModal from '@/components/shared/EnhancedWarmIntroModal';
 import SearchFiltersComponent, { SearchFilters } from '@/components/shared/SearchFilters';
 import ConnectionStrengthIndicator from '@/components/shared/ConnectionStrengthIndicator';
 import SavedSearches from '@/components/shared/SavedSearches';
-import PremiumBadge from '@/components/shared/PremiumBadge';
 
 export default function DashboardPage() {
   const { token, user } = useAuth();
@@ -455,24 +454,26 @@ export default function DashboardPage() {
                 
                 {/* Active Filters Display */}
                 {Object.keys(searchFilters).length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {searchFilters.industries?.map(industry => (
-                      <Badge key={industry} variant="secondary" className="text-xs">
-                        {industry}
-                      </Badge>
-                    ))}
-                    {searchFilters.hiring_status === 'hiring' && (
-                      <Badge variant="secondary" className="text-xs">Actively Hiring</Badge>
-                    )}
-                    {searchFilters.hiring_status === 'open_to_work' && (
-                      <Badge variant="secondary" className="text-xs">Open to Work</Badge>
-                    )}
-                    {searchFilters.is_company_owner && (
-                      <Badge variant="secondary" className="text-xs">Company Owner</Badge>
-                    )}
-                    {searchFilters.has_pe_vc_role && (
-                      <Badge variant="secondary" className="text-xs">PE/VC Role</Badge>
-                    )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap gap-1">
+                      {searchFilters.open_to_work && (
+                        <Badge variant="secondary" className="text-xs">Open to Work</Badge>
+                      )}
+                      {searchFilters.country && (
+                        <Badge variant="secondary" className="text-xs">
+                          📍 {searchFilters.country}
+                        </Badge>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleClearFilters}
+                      className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 h-auto"
+                    >
+                      <X className="w-3 h-3 mr-1" />
+                      Clear Filters
+                    </Button>
                   </div>
                 )}
               </div>
@@ -650,12 +651,8 @@ export default function DashboardPage() {
 
                   {/* Badges */}
                   <div className="flex flex-wrap gap-2 mb-4">
-                    <PremiumBadge isPremium={!!result.connection.is_premium} size="sm" />
-                    {result.connection.is_top_voice && <Badge className="bg-blue-500 hover:bg-blue-600 text-white">Top Voice</Badge>}
-                    {result.connection.is_influencer && <Badge className="bg-pink-500 hover:bg-pink-600 text-white">Influencer</Badge>}
                     {result.connection.is_hiring && <Badge className="bg-green-500 hover:bg-green-600 text-white">Hiring</Badge>}
                     {result.connection.is_open_to_work && <Badge className="bg-teal-500 hover:bg-teal-600 text-white">Open to Work</Badge>}
-                    {result.connection.is_creator && <Badge className="bg-indigo-500 hover:bg-indigo-600 text-white">Creator</Badge>}
                   </div>
 
                   {/* Connection Strength Indicator - TEMPORARILY HIDDEN FOR PRODUCTION */}
@@ -728,7 +725,9 @@ export default function DashboardPage() {
                         rel="noopener noreferrer"
                         className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 w-full sm:w-auto"
                       >
-                        <Linkedin className="w-4 h-4 mr-2" />
+                        <span className="inline-flex items-center justify-center w-6 h-6 mr-2 bg-blue-600 text-white text-xs font-bold rounded">
+                          in
+                        </span>
                         LinkedIn Profile
                       </a>
                     )}
