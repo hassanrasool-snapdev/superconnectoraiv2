@@ -17,7 +17,7 @@ from app.services.follow_up_email_service import (
     get_follow_ups_by_warm_intro,
     get_follow_up_stats,
     process_pending_follow_ups,
-    process_automated_follow_ups
+    process_manual_follow_ups
 )
 from app.services.scheduler_service import get_scheduler_status, trigger_manual_follow_up_processing
 from app.core.db import get_database
@@ -36,7 +36,7 @@ async def schedule_follow_up(
     """Schedule a follow-up email for a warm intro request"""
     try:
         # Only admin users can schedule follow-up emails
-        if current_user.role != "admin":
+        if current_user.get("role") != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admin users can schedule follow-up emails"
@@ -73,7 +73,7 @@ async def get_pending_follow_up_emails(
     """Get all pending follow-up emails"""
     try:
         # Only admin users can view pending follow-up emails
-        if current_user.role != "admin":
+        if current_user.get("role") != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admin users can view pending follow-up emails"
@@ -98,7 +98,7 @@ async def send_follow_up(
     """Manually send a follow-up email"""
     try:
         # Only admin users can manually send follow-up emails
-        if current_user.role != "admin":
+        if current_user.get("role") != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admin users can send follow-up emails"
@@ -132,7 +132,7 @@ async def cancel_follow_up(
     """Cancel a scheduled follow-up email"""
     try:
         # Only admin users can cancel follow-up emails
-        if current_user.role != "admin":
+        if current_user.get("role") != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admin users can cancel follow-up emails"
@@ -170,7 +170,7 @@ async def get_follow_ups_for_warm_intro(
         follow_ups = await get_follow_ups_by_warm_intro(db, warm_intro_id)
         
         # If not admin, filter to only show follow-ups for the current user's requests
-        if current_user.role != "admin":
+        if current_user.get("role") != "admin":
             # In a real implementation, you'd verify the warm intro belongs to the current user
             # For now, we'll allow all authenticated users to view
             pass
@@ -192,7 +192,7 @@ async def get_follow_up_email_stats(
     """Get statistics about follow-up emails"""
     try:
         # Only admin users can view follow-up email stats
-        if current_user.role != "admin":
+        if current_user.get("role") != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admin users can view follow-up email statistics"
@@ -218,7 +218,7 @@ async def process_pending_follow_up_emails(
     """Manually trigger processing of pending follow-up emails"""
     try:
         # Only admin users can trigger follow-up email processing
-        if current_user.role != "admin":
+        if current_user.get("role") != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admin users can trigger follow-up email processing"
@@ -249,7 +249,7 @@ async def get_all_follow_up_emails(
     """Get all follow-up emails with optional filtering"""
     try:
         # Only admin users can view all follow-up emails
-        if current_user.role != "admin":
+        if current_user.get("role") != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admin users can view all follow-up emails"
@@ -282,7 +282,7 @@ async def get_follow_up_scheduler_status(
     """Get the status of the follow-up email scheduler"""
     try:
         # Only admin users can view scheduler status
-        if current_user.role != "admin":
+        if current_user.get("role") != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admin users can view scheduler status"
@@ -307,7 +307,7 @@ async def manually_process_all_follow_ups(
     """Manually trigger processing of all follow-up emails (both legacy and automated)"""
     try:
         # Only admin users can trigger manual processing
-        if current_user.role != "admin":
+        if current_user.get("role") != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admin users can trigger manual follow-up processing"
@@ -345,7 +345,7 @@ async def manually_process_automated_follow_ups(
     """Manually trigger processing of automated follow-up emails only"""
     try:
         # Only admin users can trigger manual processing
-        if current_user.role != "admin":
+        if current_user.get("role") != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admin users can trigger automated follow-up processing"
@@ -364,4 +364,282 @@ async def manually_process_automated_follow_ups(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to trigger automated processing: {str(e)}"
+        )
+
+@router.get("/admin/candidates", response_model=List[dict])
+async def get_follow_up_candidates(
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    """Get warm intro requests that are eligible for follow-up emails (14+ days old)"""
+    try:
+        # Only admin users can view follow-up candidates
+        if current_user.get("role") != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admin users can view follow-up candidates"
+            )
+        
+        from app.services.follow_up_email_service import get_eligible_warm_intro_requests
+        candidates = await get_eligible_warm_intro_requests(db)
+        
+        # Enrich with user information
+        enriched_candidates = []
+        for candidate in candidates:
+            # Handle both field naming conventions
+            user_id = candidate.get("user_id") or candidate.get("requester_id")
+            
+            if user_id:
+                # Get user email - handle both _id and id field naming
+                user = await db.users.find_one({"$or": [{"_id": user_id}, {"id": user_id}]})
+                if user:
+                    candidate["user_email"] = user["email"]
+                    candidate["days_old"] = (datetime.utcnow() - candidate["created_at"]).days
+                    
+                    # Convert ObjectId to string for serialization
+                    if "_id" in candidate:
+                        candidate["_id"] = str(candidate["_id"])
+                    
+                    enriched_candidates.append(candidate)
+                else:
+                    logger.warning(f"User not found for candidate with user_id: {user_id}")
+            else:
+                logger.warning(f"No valid user_id found in candidate: {candidate}")
+        
+        return enriched_candidates
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting follow-up candidates: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get follow-up candidates: {str(e)}"
+        )
+
+@router.post("/admin/send/{request_id}")
+async def send_individual_follow_up(
+    request_id: str,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    """Generate and provide follow-up email content for manual sending via email client"""
+    try:
+        # Only admin users can send follow-up emails
+        if current_user.get("role") != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admin users can send follow-up emails"
+            )
+        
+        from app.services.follow_up_email_service import generate_automated_follow_up_content
+        
+        # Get the warm intro request
+        request = await db.warm_intro_requests.find_one({"id": request_id})
+        if not request:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Warm intro request not found"
+            )
+        
+        # Handle both field naming conventions
+        user_id = request.get("user_id") or request.get("requester_id")
+        request_id = request.get("id") or request.get("_id")
+        
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User ID not found in request"
+            )
+        
+        # Get user email - handle both _id and id field naming
+        user = await db.users.find_one({"$or": [{"_id": user_id}, {"id": user_id}]})
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Generate email content with response links
+        email_content = generate_automated_follow_up_content(
+            request["requester_name"],
+            request.get("connection_name") or request.get("target_name"),
+            request_id
+        )
+        
+        # Create simple plain text email with URLs formatted for better email client recognition
+        # Generate donation URL
+        donate_url = "http://localhost:3000/donate"
+        
+        # Generate response URLs
+        yes_url = f"http://localhost:3000/warm-intro-response-demo?response=yes&request_id={request_id}"
+        no_url = f"http://localhost:3000/warm-intro-response-demo?response=no&request_id={request_id}"
+        
+        # Create plain text email body with URLs formatted for maximum clickability
+        plain_text_body = f"""Hello {request["requester_name"]},
+
+Just checking in on your warm intro request to connect with {request.get("connection_name") or request.get("target_name")}. Were you able to connect?
+
+Please reply to this email to let us know how the connection went. Your feedback helps us improve our service and track the success of our warm introductions.
+
+If you need any further support with your networking goals, please don't hesitate to reach out.
+
+Help keep Superconnector AI alive! If you found this service helpful, please consider making a donation:
+{donate_url}
+
+Thanks,
+The Superconnector Team
+
+This is an automated follow-up email from Superconnector AI.
+If you no longer wish to receive these emails, please contact support."""
+        
+        # Mark as follow-up sent (admin handles actual sending via email client)
+        await db.warm_intro_requests.update_one(
+            {"id": request_id},
+            {
+                "$set": {
+                    "follow_up_sent_date": datetime.utcnow(),
+                    "follow_up_sent_by": current_user["id"],
+                    "follow_up_method": "manual",
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        logger.info(f"Manual follow-up email marked as sent for warm intro request {request_id}")
+        
+        # Return in the same format as access requests
+        return {
+            "message": "Follow-up email ready for sending",
+            "email_template": {
+                "to": user["email"],
+                "subject": "Following up on your introduction request",
+                "body": plain_text_body
+            }
+        }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating follow-up email content: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate follow-up email content: {str(e)}"
+        )
+
+@router.get("/admin/preview/{request_id}")
+async def preview_follow_up_email(
+    request_id: str,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    """Preview the follow-up email content for a specific warm intro request"""
+    try:
+        # Only admin users can preview follow-up emails
+        if current_user.get("role") != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admin users can preview follow-up emails"
+            )
+        
+        from app.services.follow_up_email_service import generate_automated_follow_up_content
+        
+        # Get the warm intro request
+        request = await db.warm_intro_requests.find_one({"id": request_id})
+        if not request:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Warm intro request not found"
+            )
+        
+        # Handle both field naming conventions
+        user_id = request.get("user_id") or request.get("requester_id")
+        request_id = request.get("id") or request.get("_id")
+        
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User ID not found in request"
+            )
+        
+        # Get user email - handle both _id and id field naming
+        user = await db.users.find_one({"$or": [{"_id": user_id}, {"id": user_id}]})
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Generate email content
+        email_content = generate_automated_follow_up_content(
+            request["requester_name"],
+            request.get("connection_name") or request.get("target_name"),
+            request_id
+        )
+        
+        return {
+            "to_email": user["email"],
+            "subject": "Following up on your introduction request",
+            "html_content": email_content,
+            "request_id": request_id,
+            "requester_name": request["requester_name"],
+            "connection_name": request["connection_name"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error previewing follow-up email: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to preview follow-up email: {str(e)}"
+        )
+
+@router.post("/admin/skip/{request_id}")
+async def skip_follow_up_email(
+    request_id: str,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    """Mark a warm intro request as skipped for follow-up"""
+    try:
+        # Only admin users can skip follow-up emails
+        if current_user.get("role") != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admin users can skip follow-up emails"
+            )
+        
+        # Update the request to mark it as skipped
+        result = await db.warm_intro_requests.update_one(
+            {"id": request_id},
+            {
+                "$set": {
+                    "follow_up_skipped": True,
+                    "follow_up_skipped_date": datetime.utcnow(),
+                    "follow_up_skipped_by": current_user["id"],
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        if result.modified_count > 0:
+            return {
+                "message": "Follow-up email skipped successfully",
+                "request_id": request_id,
+                "skipped_at": datetime.utcnow().isoformat()
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Warm intro request not found"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error skipping follow-up email: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to skip follow-up email: {str(e)}"
         )
