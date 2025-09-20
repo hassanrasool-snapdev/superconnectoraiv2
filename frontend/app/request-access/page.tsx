@@ -45,21 +45,21 @@ export default function RequestAccessPage() {
 
   if (success) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-2xl text-center text-green-600">Request Submitted!</CardTitle>
-            <CardDescription className="text-center">
+      <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
+        <Card className="w-full max-w-lg">
+          <CardHeader className="space-y-4 pb-8">
+            <CardTitle className="text-4xl font-bold text-center text-green-600">Request Submitted!</CardTitle>
+            <CardDescription className="text-lg text-center text-gray-600">
               Your access request has been submitted successfully.
             </CardDescription>
           </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-sm text-gray-600 mb-4">
+          <CardContent className="text-center space-y-6">
+            <p className="text-base text-gray-600">
               We&apos;ll review your request and get back to you via email within 1-2 business days.
             </p>
-            <p className="text-xs text-gray-500">
+            <p className="text-base text-gray-500">
               If you already have an account, you can{' '}
-              <Link href="/login" className="text-blue-600 hover:underline">
+              <Link href="/login" className="text-blue-600 hover:text-blue-800 underline font-medium">
                 sign in here
               </Link>
             </p>
@@ -70,18 +70,18 @@ export default function RequestAccessPage() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl">Request Access</CardTitle>
-          <CardDescription>
+    <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
+      <Card className="w-full max-w-lg">
+        <CardHeader className="space-y-4 pb-8">
+          <CardTitle className="text-4xl font-bold text-center">Request Access</CardTitle>
+          <CardDescription className="text-lg text-center text-gray-600">
             Fill out the form below to request access to Superconnect AI.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="full_name">Full Name *</Label>
+          <CardContent className="grid gap-6">
+            <div className="grid gap-3">
+              <Label htmlFor="full_name" className="text-base font-medium">Full Name *</Label>
               <Input
                 id="full_name"
                 name="full_name"
@@ -90,10 +90,11 @@ export default function RequestAccessPage() {
                 required
                 value={formData.full_name}
                 onChange={handleInputChange}
+                className="h-12 text-base"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email Address *</Label>
+            <div className="grid gap-3">
+              <Label htmlFor="email" className="text-base font-medium">Email Address *</Label>
               <Input
                 id="email"
                 name="email"
@@ -102,10 +103,11 @@ export default function RequestAccessPage() {
                 required
                 value={formData.email}
                 onChange={handleInputChange}
+                className="h-12 text-base"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="organization">Organization</Label>
+            <div className="grid gap-3">
+              <Label htmlFor="organization" className="text-base font-medium">Organization</Label>
               <Input
                 id="organization"
                 name="organization"
@@ -113,10 +115,11 @@ export default function RequestAccessPage() {
                 placeholder="Your company or organization"
                 value={formData.organization}
                 onChange={handleInputChange}
+                className="h-12 text-base"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="reason">Reason for Access</Label>
+            <div className="grid gap-3">
+              <Label htmlFor="reason" className="text-base font-medium">Reason for Access</Label>
               <Textarea
                 id="reason"
                 name="reason"
@@ -124,17 +127,18 @@ export default function RequestAccessPage() {
                 rows={4}
                 value={formData.reason}
                 onChange={handleInputChange}
+                className="text-base min-h-[100px]"
               />
             </div>
-            {error && <p className="text-red-500 text-sm">{error}</p>}
+            {error && <p className="text-red-500 text-base font-medium">{error}</p>}
           </CardContent>
-          <CardFooter className="flex flex-col">
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+          <CardFooter className="flex flex-col pt-6">
+            <Button type="submit" className="w-full h-12 text-base font-medium" disabled={isSubmitting}>
               {isSubmitting ? 'Submitting Request...' : 'Submit Request'}
             </Button>
-            <p className="mt-4 text-xs text-center text-gray-700">
+            <p className="mt-6 text-base text-center text-gray-700">
               Already have an account?{' '}
-              <Link href="/login" className="underline">
+              <Link href="/login" className="underline font-medium text-blue-600 hover:text-blue-800">
                 Sign in
               </Link>
             </p>

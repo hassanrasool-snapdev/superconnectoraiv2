@@ -45,31 +45,48 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>Enter your email below to login to your account.</CardDescription>
+    <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-4 pb-8">
+          <CardTitle className="text-4xl font-bold text-center">Login</CardTitle>
+          <CardDescription className="text-lg text-center text-gray-600">
+            Enter your email below to login to your account.
+          </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="m@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          <CardContent className="grid gap-6">
+            <div className="grid gap-3">
+              <Label htmlFor="email" className="text-base font-medium">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="m@example.com"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="h-12 text-base"
+              />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+            <div className="grid gap-3">
+              <Label htmlFor="password" className="text-base font-medium">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-12 text-base"
+              />
             </div>
-            {error && <p className="text-red-500 text-sm">{error}</p>}
+            {error && <p className="text-red-500 text-base font-medium">{error}</p>}
           </CardContent>
-          <CardFooter className="flex flex-col">
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+          <CardFooter className="flex flex-col pt-6">
+            <Button type="submit" className="w-full h-12 text-base font-medium" disabled={isSubmitting}>
               {isSubmitting ? 'Signing in...' : 'Sign in'}
             </Button>
-            <p className="mt-4 text-xs text-center text-gray-700">
+            <p className="mt-6 text-base text-center text-gray-700">
               Don&apos;t have an account?{' '}
-              <Link href="/request-access" className="underline">
+              <Link href="/request-access" className="underline font-medium text-blue-600 hover:text-blue-800">
                 Request Access
               </Link>
             </p>
