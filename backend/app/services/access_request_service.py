@@ -82,15 +82,8 @@ async def update_access_request(db, request_id: str, update_data: AccessRequestU
         with open(template_path, 'r') as f:
             html_content = f.read()
         
-        # Convert HTML to plain text for email body
-        email_body = f"""Hello {updated_request['full_name']},
-
-Thank you for your interest. After careful consideration, we are unable to approve your access request at this time.
-
-We appreciate you taking the time to submit a request.
-
-Sincerely,
-The Superconnector Team"""
+        # Replace placeholder with actual name
+        email_body = html_content.replace("[First name]", updated_request['full_name'])
         
         # Store email template data in the response
         updated_request["email_template"] = {
@@ -157,21 +150,10 @@ async def approve_access_request_and_create_user(db, request_id: str, admin_id: 
     # Generate approval email template data
     template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'access-approved.html')
     with open(template_path, 'r') as f:
-        html_content = f.read().replace("{{ temporary_password }}", temp_password)
+        html_content = f.read()
 
-    # Convert to plain text for email body
-    email_body = f"""Hello {request['full_name']},
-
-Welcome! Your request for access has been approved by an administrator.
-
-To log in for the first time, please use the following temporary passcode. You will be prompted to create a new password after logging in.
-
-Temporary Passcode: {temp_password}
-
-If you have any questions, please don't hesitate to contact us.
-
-Thank you!
-The Superconnector Team"""
+    # Replace placeholders with actual values
+    email_body = html_content.replace("[Name]", request['full_name']).replace("[passcode]", temp_password)
 
     # Create email template data
     email_template = {
@@ -182,3 +164,10 @@ The Superconnector Team"""
     }
     
     return user_dict, temp_password, email_template
+
+async def count_pending_access_requests(db):
+    """Count the number of pending access requests"""
+    count = await db.access_requests.count_documents({
+        "status": AccessRequestStatus.pending.value
+    })
+    return count

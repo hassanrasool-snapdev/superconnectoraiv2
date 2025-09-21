@@ -91,3 +91,12 @@ async def approve_access_request(
         "user": user_with_otp.model_dump(),
         "email_template": email_template
     }
+
+@router.get("/admin/access-requests/pending/count", response_model=int)
+async def get_pending_access_requests_count(
+    db=Depends(get_database),
+    current_admin: dict = Depends(auth_service.get_current_admin_user)
+):
+    """Admin endpoint to get the count of pending access requests"""
+    count = await access_request_service.count_pending_access_requests(db)
+    return count

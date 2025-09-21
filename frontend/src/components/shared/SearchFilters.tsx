@@ -129,7 +129,8 @@ export default function SearchFiltersComponent({ filters, onFiltersChange, onCle
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
+      {/* Filter button commented out to remove from UI */}
+      {/* <DialogTrigger asChild>
         <Button variant="outline" className="relative">
           <Filter className="w-4 h-4 mr-2" />
           Filters
@@ -139,7 +140,7 @@ export default function SearchFiltersComponent({ filters, onFiltersChange, onCle
             </Badge>
           )}
         </Button>
-      </DialogTrigger>
+      </DialogTrigger> */}
       
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>

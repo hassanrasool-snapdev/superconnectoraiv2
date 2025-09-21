@@ -28,7 +28,8 @@ import {
   Check,
   Mail,
   ArrowLeft,
-  Edit3
+  Edit3,
+  Copy
 } from 'lucide-react';
 
 import { telemetry } from '@/lib/telemetry';
@@ -426,6 +427,33 @@ ${emailLine}`;
     }
   }, [requesterName, targetFirstName, targetLastName, token, toast, onSuccess, onClose]);
 
+  // Copy email content to clipboard
+  const handleCopyEmail = useCallback(async () => {
+    try {
+      const emailContent = generateEmailContent();
+      await navigator.clipboard.writeText(emailContent);
+      toast({
+        title: "Copied to clipboard!",
+        description: "The email content has been copied to your clipboard.",
+        duration: 3000,
+      });
+    } catch (error) {
+      // Fallback for browsers that don't support clipboard API
+      const textArea = document.createElement('textarea');
+      textArea.value = generateEmailContent();
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      
+      toast({
+        title: "Copied to clipboard!",
+        description: "The email content has been copied to your clipboard.",
+        duration: 3000,
+      });
+    }
+  }, [generateEmailContent, toast]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -810,7 +838,7 @@ ${emailLine}`;
             </Button>
           </div>
           
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="bg-white border border-gray-200 rounded-lg p-4 relative">
             <div className="space-y-2 text-sm">
               <div className="flex items-center space-x-2 text-gray-600">
                 <span className="font-medium">To:</span>
@@ -827,12 +855,25 @@ ${emailLine}`;
                 {generateEmailContent()}
               </pre>
             </div>
+            
+            {/* Copy Icon */}
+            <button
+              onClick={handleCopyEmail}
+              className="absolute bottom-3 right-3 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors duration-200"
+              title="Copy email content to clipboard"
+              aria-label="Copy email content to clipboard"
+            >
+              <Copy className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>
 
       {/* Footer */}
       <div className="pt-6 border-t border-gray-200 space-y-4">
+        <p className="text-sm text-gray-800 font-medium bg-blue-50 border border-blue-200 rounded-lg p-3">
+          Copy and paste the body text above before clicking 'submit'. If an email doesn't launch paste the message into an email and send to ha@superconnect.ai
+        </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-end">
           <Button
             variant="ghost"
@@ -862,6 +903,7 @@ ${emailLine}`;
     handleClose,
     handleBackToForm,
     handleSubmit,
+    handleCopyEmail,
     isSubmitting
   ]);
 

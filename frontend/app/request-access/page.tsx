@@ -107,12 +107,12 @@ export default function RequestAccessPage() {
               />
             </div>
             <div className="grid gap-3">
-              <Label htmlFor="organization" className="text-base font-medium">Organization</Label>
+              <Label htmlFor="organization" className="text-base font-medium">Your LinkedIn Profile</Label>
               <Input
                 id="organization"
                 name="organization"
                 type="text"
-                placeholder="Your company or organization"
+                placeholder="Enter your LinkedIn Profile URL"
                 value={formData.organization}
                 onChange={handleInputChange}
                 className="h-12 text-base"
@@ -123,7 +123,7 @@ export default function RequestAccessPage() {
               <Textarea
                 id="reason"
                 name="reason"
-                placeholder="Please briefly explain why you need access to Superconnect AI..."
+                placeholder="Share how you know Ha and the reason for your access request"
                 rows={4}
                 value={formData.reason}
                 onChange={handleInputChange}

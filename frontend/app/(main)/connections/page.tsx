@@ -15,7 +15,7 @@ export default function ConnectionsPage() {
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState<number | null>(null);
-  const [minRating, setMinRating] = useState<number>(6);
+  // const [minRating, setMinRating] = useState<number>(6);
   const { token } = useAuth();
   const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
 
@@ -34,7 +34,7 @@ export default function ConnectionsPage() {
         .catch(err => setError(err.message))
         .finally(() => setLoading(false));
     }
-  }, [token, page, minRating]);
+  }, [token, page]); // minRating dependency commented out
 
   if (loading) return <p>Loading connections...</p>;
   if (error) return <p className="text-red-600">Error: {error}</p>;
@@ -51,7 +51,8 @@ export default function ConnectionsPage() {
               </p>
             )}
           </div>
-          <div className="w-full max-w-xs">
+          {/* Filter feature commented out */}
+          {/* <div className="w-full max-w-xs">
             <Label htmlFor="min-rating">Minimum Rating: {minRating}</Label>
             <input
               id="min-rating"
@@ -67,7 +68,7 @@ export default function ConnectionsPage() {
               <span>6</span>
               <span>10</span>
             </div>
-          </div>
+          </div> */}
         </div>
         <div className="overflow-x-auto">
           <Table>
