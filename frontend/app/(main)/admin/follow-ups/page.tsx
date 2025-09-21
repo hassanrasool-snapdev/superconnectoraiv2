@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { RefreshCw, Mail, X, Clock, User, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { WeeklyInspiration } from "@/components/shared/WeeklyInspiration";
 
 interface FollowUpCandidate {
   id: string;
@@ -180,6 +181,9 @@ export default function AdminFollowUpsPage() {
 
   return (
     <div className="container mx-auto p-4 space-y-6">
+      {/* Weekly Inspiration Panel */}
+      <WeeklyInspiration />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -201,17 +205,12 @@ export default function AdminFollowUpsPage() {
 
       {/* Stats Card */}
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader>
           <CardDescription>Requests Needing Follow-up</CardDescription>
           <CardTitle className="text-3xl text-orange-600">
             {candidates.length}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-gray-600">
-            Warm intro requests that are 14+ days old and haven't received follow-up emails
-          </p>
-        </CardContent>
       </Card>
 
       {/* Candidates List */}

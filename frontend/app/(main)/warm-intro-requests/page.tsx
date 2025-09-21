@@ -8,7 +8,6 @@ import { WarmIntroRequest, WarmIntroStatus, PaginatedWarmIntroRequests } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, ChevronRight, Filter, RefreshCw, Download } from "lucide-react";
@@ -455,54 +454,92 @@ export default function WarmIntroRequestsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="py-3">
+          <CardHeader className="pb-1">
             <CardDescription>Total Requests</CardDescription>
             <CardTitle className="text-2xl">{totalRequests}</CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="py-3">
+          <CardHeader className="pb-1">
             <CardDescription>Pending</CardDescription>
             <CardTitle className="text-2xl text-yellow-600">
               {requests.filter(r => r.status === WarmIntroStatus.pending).length}
             </CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="py-3">
+          <CardHeader className="pb-1">
             <CardDescription>Approved</CardDescription>
             <CardTitle className="text-2xl text-green-600">
               {requests.filter(r => r.status === WarmIntroStatus.connected).length}
             </CardTitle>
           </CardHeader>
         </Card>
+        <Card className="py-3">
+          <CardHeader className="pb-1">
+            <CardDescription>Denied</CardDescription>
+            <CardTitle className="text-2xl text-red-600">
+              {requests.filter(r => r.status === WarmIntroStatus.declined).length}
+            </CardTitle>
+          </CardHeader>
+        </Card>
       </div>
 
-      {/* Filters */}
+      {/* Filters - Segmented Control */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <Filter className="w-4 h-4 text-gray-500" />
+        <CardContent className="pt-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex items-center gap-2">
-              <label htmlFor="status-filter" className="text-sm font-medium text-gray-700">
-                Status:
-              </label>
-              <Select
-                value={statusFilter}
-                onValueChange={handleStatusChange}
+              <Filter className="w-4 h-4 text-gray-500" />
+              <span className="text-sm font-medium text-gray-700">Status:</span>
+            </div>
+            <div className="flex flex-wrap gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+              <button
+                onClick={() => handleStatusChange('all')}
+                className={cn(
+                  "px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
+                  statusFilter === 'all'
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                )}
               >
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value={WarmIntroStatus.pending}>Pending</SelectItem>
-                  <SelectItem value={WarmIntroStatus.connected}>Approved</SelectItem>
-                  <SelectItem value={WarmIntroStatus.declined}>Declined</SelectItem>
-                </SelectContent>
-              </Select>
+                All
+              </button>
+              <button
+                onClick={() => handleStatusChange(WarmIntroStatus.pending)}
+                className={cn(
+                  "px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
+                  statusFilter === WarmIntroStatus.pending
+                    ? "bg-white text-yellow-700 shadow-sm"
+                    : "text-gray-600 hover:text-yellow-700 hover:bg-yellow-50"
+                )}
+              >
+                Pending
+              </button>
+              <button
+                onClick={() => handleStatusChange(WarmIntroStatus.connected)}
+                className={cn(
+                  "px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
+                  statusFilter === WarmIntroStatus.connected
+                    ? "bg-white text-green-700 shadow-sm"
+                    : "text-gray-600 hover:text-green-700 hover:bg-green-50"
+                )}
+              >
+                Approved
+              </button>
+              <button
+                onClick={() => handleStatusChange(WarmIntroStatus.declined)}
+                className={cn(
+                  "px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
+                  statusFilter === WarmIntroStatus.declined
+                    ? "bg-white text-red-700 shadow-sm"
+                    : "text-gray-600 hover:text-red-700 hover:bg-red-50"
+                )}
+              >
+                Denied
+              </button>
             </div>
           </div>
         </CardContent>
