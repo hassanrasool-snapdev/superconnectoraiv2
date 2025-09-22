@@ -138,18 +138,17 @@ def generate_follow_up_email_content(requester_name: str, connection_name: str, 
     """Generate the follow-up email content as specified in the PRD"""
     return f"""Hi {requester_name},
 
-I just wanted to check in with you to make sure you were able to make the connection with {connection_name} that you requested and if there is anything further you need. Please let me know.
+I wanted to check in on the warm intro I made for you with {connection_name} a couple of weeks ago. Were the two of you able to connect?
 
-Thank you,
-{facilitator_name}
+I'd love to hear how it went. Was it helpful, or not as useful as you hoped? Just hit reply to share your feedback. It really helps me understand the impact of these introductions and how to make SuperConnect AI even better.
 
-P.S. Help keep Superconnect AI alive. Most people choose to contribute $20. It helps keep the lights on and the warm intros coming.
+SuperConnect is a labor of love, and it's sustained by the support of individuals like you. If you found this connection valuable, I'd be so grateful if you'd consider leaving a contribution to help keep it alive and keep the warm intros coming:
+{settings.FRONTEND_URL}/donate
 
-[Contribute Now - $20] [Other Amount] [No Thanks]
+Thanks for being part of this journey, and for helping me build a tool that sparks meaningful connections.
 
----
-This is an automated follow-up email from Superconnect AI.
-If you no longer wish to receive these emails, please reply with "UNSUBSCRIBE".
+Warmly,
+Ha
 """
 
 async def simulate_email_send(to_email: str, subject: str, content: str) -> bool:
@@ -158,7 +157,7 @@ async def simulate_email_send(to_email: str, subject: str, content: str) -> bool
         # Simulate email sending delay
         await asyncio.sleep(0.1)
         
-        # Log the email (in production, you'd use a real email service like SendGrid, AWS SES, etc.)
+        # Log the email (in production, you'd use a real email service like Resend, AWS SES, etc.)
         logger.info(f"SIMULATED EMAIL SENT:")
         logger.info(f"To: {to_email}")
         logger.info(f"Subject: {subject}")
@@ -327,28 +326,22 @@ def generate_automated_follow_up_content(requester_name: str, connection_name: s
     <html>
     <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
         <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-            <p>Hi there,</p>
+            <p>Hi {requester_name},</p>
             
-            <p>Just checking in on your warm intro request to connect with <strong>{connection_name}</strong>. Were you able to connect?</p>
+            <p>I wanted to check in on the warm intro I made for you with <strong>{connection_name}</strong> a couple of weeks ago. Were the two of you able to connect?</p>
             
-            <p>Please reply to this email to let us know how the connection went. Your feedback helps us improve our service and track the success of our warm introductions.</p>
+            <p>I'd love to hear how it went. Was it helpful, or not as useful as you hoped? Just hit reply to share your feedback. It really helps me understand the impact of these introductions and how to make SuperConnect AI even better.</p>
             
-            <p>If you need any further support with your networking goals, please don't hesitate to reach out.</p>
+            <p>SuperConnect is a labor of love, and it's sustained by the support of individuals like you. If you found this connection valuable, I'd be so grateful if you'd consider leaving a contribution to help keep it alive and keep the warm intros coming:</p>
             
-            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 30px 0; text-align: center;">
-                <p style="margin-bottom: 15px;"><strong>Help keep Superconnector AI alive!</strong></p>
-                <p style="margin-bottom: 15px;">If you found this service helpful, please consider making a donation to support our work.</p>
-                <a href="{donate_link}" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Make a Donation</a>
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="{donate_link}" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Make a Contribution</a>
             </div>
             
-            <p>Thanks,<br>
-            The Superconnector Team</p>
+            <p>Thanks for being part of this journey, and for helping me build a tool that sparks meaningful connections.</p>
             
-            <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-            <p style="font-size: 12px; color: #666;">
-                This is an automated follow-up email from Superconnector AI.<br>
-                If you no longer wish to receive these emails, please contact support.
-            </p>
+            <p>Warmly,<br>
+            Ha</p>
         </div>
     </body>
     </html>

@@ -8,7 +8,6 @@ from app.services.follow_up_email_service import (
     get_eligible_warm_intro_requests,
     send_automated_follow_up_email,
     generate_automated_follow_up_content,
-    send_email_via_sendgrid,
     process_automated_follow_ups,
     record_user_response
 )
@@ -94,7 +93,7 @@ class TestSendAutomatedFollowUpEmail:
         }
         
         # Mock successful email sending
-        with patch('app.services.follow_up_email_service.send_email_via_sendgrid', return_value=True):
+        with patch('app.services.follow_up_email_service.simulate_email_send', return_value=True):
             # Mock database update
             mock_db.warm_intro_requests.update_one.return_value = MagicMock()
             
@@ -145,7 +144,7 @@ class TestSendAutomatedFollowUpEmail:
         }
         
         # Mock failed email sending
-        with patch('app.services.follow_up_email_service.send_email_via_sendgrid', return_value=False):
+        with patch('app.services.follow_up_email_service.simulate_email_send', return_value=False):
             result = await send_automated_follow_up_email(mock_db, warm_intro_request)
             
             assert result is False
@@ -190,56 +189,6 @@ class TestGenerateAutomatedFollowUpContent:
             assert expected_yes_link in content
             assert expected_no_link in content
             assert expected_donate_link in content
-
-
-class TestSendEmailViaSendgrid:
-    """Test the SendGrid email sending function."""
-    
-    @pytest.mark.asyncio
-    async def test_send_email_no_api_key_falls_back_to_simulation(self):
-        """Test that when no API key is configured, it falls back to simulation."""
-        with patch('app.services.follow_up_email_service.settings') as mock_settings:
-            mock_settings.SENDGRID_API_KEY = ""
-            
-            with patch('app.services.follow_up_email_service.simulate_email_send', return_value=True) as mock_simulate:
-                result = await send_email_via_sendgrid("test@example.com", "Test Subject", "<html>Test</html>")
-                
-                assert result is True
-                mock_simulate.assert_called_once_with("test@example.com", "Test Subject", "<html>Test</html>")
-    
-    @pytest.mark.asyncio
-    async def test_send_email_with_sendgrid_success(self):
-        """Test successful email sending with SendGrid."""
-        with patch('app.services.follow_up_email_service.settings') as mock_settings:
-            mock_settings.SENDGRID_API_KEY = "test_api_key"
-            mock_settings.FROM_EMAIL = "noreply@test.com"
-            mock_settings.FROM_NAME = "Test Service"
-            
-            with patch('app.services.follow_up_email_service.sendgrid.SendGridAPIClient') as mock_sg_client:
-                mock_response = MagicMock()
-                mock_response.status_code = 202
-                mock_sg_client.return_value.client.mail.send.post.return_value = mock_response
-                
-                result = await send_email_via_sendgrid("test@example.com", "Test Subject", "<html>Test</html>")
-                
-                assert result is True
-    
-    @pytest.mark.asyncio
-    async def test_send_email_with_sendgrid_failure(self):
-        """Test failed email sending with SendGrid."""
-        with patch('app.services.follow_up_email_service.settings') as mock_settings:
-            mock_settings.SENDGRID_API_KEY = "test_api_key"
-            mock_settings.FROM_EMAIL = "noreply@test.com"
-            mock_settings.FROM_NAME = "Test Service"
-            
-            with patch('app.services.follow_up_email_service.sendgrid.SendGridAPIClient') as mock_sg_client:
-                mock_response = MagicMock()
-                mock_response.status_code = 400
-                mock_sg_client.return_value.client.mail.send.post.return_value = mock_response
-                
-                result = await send_email_via_sendgrid("test@example.com", "Test Subject", "<html>Test</html>")
-                
-                assert result is False
 
 
 class TestProcessAutomatedFollowUps:

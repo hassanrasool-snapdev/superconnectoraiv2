@@ -63,7 +63,7 @@ class TestFollowUpEmailE2E:
             mock_db.users.find_one.return_value = user_data
             
             # Step 3: Mock successful email sending
-            with patch('app.services.follow_up_email_service.send_email_via_sendgrid') as mock_send_email:
+            with patch('app.services.follow_up_email_service.simulate_email_send') as mock_send_email:
                 mock_send_email.return_value = True
                 
                 # Mock database update for follow-up sent
@@ -78,11 +78,11 @@ class TestFollowUpEmailE2E:
                 # Verify email was "sent"
                 mock_send_email.assert_called_once()
                 email_call = mock_send_email.call_args
-                assert email_call[1]["to_email"] == "john.doe@example.com"
-                assert "Following up on your introduction request" in email_call[1]["subject"]
+                assert email_call[0][0] == "john.doe@example.com"  # to_email is first positional arg
+                assert "Following up on your introduction request" in email_call[0][1]  # subject is second arg
                 
                 # Verify email content contains required elements
-                email_content = email_call[1]["html_content"]
+                email_content = email_call[0][2]  # content is third arg
                 assert "Jane Smith" in email_content  # Connection name
                 assert "Yes, we connected" in email_content
                 assert "No, not yet" in email_content
@@ -255,7 +255,7 @@ class TestFollowUpEmailE2E:
             mock_db.users.find_one.return_value = {"id": "user_id", "email": "user@example.com"}
             
             # Mock successful email sending
-            with patch('app.services.follow_up_email_service.send_email_via_sendgrid', return_value=True):
+            with patch('app.services.follow_up_email_service.simulate_email_send', return_value=True):
                 mock_db.warm_intro_requests.update_one.return_value = MagicMock()
                 
                 # Process automated follow-ups
@@ -338,7 +338,7 @@ class TestFollowUpEmailE2E:
             mock_db.warm_intro_requests.find.return_value = mock_cursor
             mock_db.users.find_one.return_value = user_data
             
-            with patch('app.services.follow_up_email_service.send_email_via_sendgrid') as mock_send_email:
+            with patch('app.services.follow_up_email_service.simulate_email_send') as mock_send_email:
                 mock_send_email.return_value = True
                 mock_db.warm_intro_requests.update_one.return_value = MagicMock()
                 
@@ -350,11 +350,11 @@ class TestFollowUpEmailE2E:
                 call_args = mock_send_email.call_args
                 
                 # Check email parameters
-                assert call_args[1]["to_email"] == "john.doe@example.com"
-                assert "Following up on your introduction request" in call_args[1]["subject"]
+                assert call_args[0][0] == "john.doe@example.com"  # to_email is first positional arg
+                assert "Following up on your introduction request" in call_args[0][1]  # subject is second arg
                 
                 # Check email content
-                content = call_args[1]["html_content"]
+                content = call_args[0][2]  # content is third arg
                 
                 # Required content elements
                 assert "Jane Smith" in content  # Connection name

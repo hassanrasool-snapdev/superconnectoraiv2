@@ -53,7 +53,7 @@ class TestFollowUpEmailIntegration:
             self.mock_db.users.find_one.return_value = user_data
             
             # Mock successful email sending
-            with patch('app.services.follow_up_email_service.send_email_via_sendgrid', return_value=True):
+            with patch('app.services.follow_up_email_service.simulate_email_send', return_value=True):
                 # Mock database update
                 self.mock_db.warm_intro_requests.update_one.return_value = MagicMock()
                 
@@ -237,7 +237,7 @@ class TestFollowUpEmailIntegration:
             self.mock_db.warm_intro_requests.find.return_value = mock_cursor
             self.mock_db.users.find_one.return_value = user_data
             
-            with patch('app.services.follow_up_email_service.send_email_via_sendgrid', return_value=True):
+            with patch('app.services.follow_up_email_service.simulate_email_send', return_value=True):
                 self.mock_db.warm_intro_requests.update_one.return_value = MagicMock()
                 
                 sent_count = await process_automated_follow_ups()
