@@ -29,7 +29,7 @@ app = FastAPI(lifespan=lifespan)
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Allows frontend origin
+    allow_origins=["http://localhost:3000", "https://superconnectoraiv2-snax.vercel.app"],  # Allows frontend origins
     allow_credentials=True,  # Can be True when specific origins are listed
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
