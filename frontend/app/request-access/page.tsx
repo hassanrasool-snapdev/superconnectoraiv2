@@ -33,6 +33,7 @@ export default function RequestAccessPage() {
     setError(null);
     setIsSubmitting(true);
 
+    console.log('Submitting to API Base URL:', process.env.NEXT_PUBLIC_API_BASE_URL);
     try {
       await submitAccessRequest(formData);
       setSuccess(true);
