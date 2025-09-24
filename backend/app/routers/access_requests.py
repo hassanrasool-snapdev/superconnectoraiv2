@@ -10,9 +10,10 @@ from app.models.user import UserWithOTP
 from app.core.db import get_database
 from app.services import access_request_service, auth_service
 
-router = APIRouter(prefix="/access-requests", tags=["Access Requests"])
+router = APIRouter(prefix="/admin/access-requests", tags=["Access Requests"])
+public_router = APIRouter(prefix="/access-requests", tags=["Access Requests"])
 
-@router.post("/", response_model=AccessRequestPublic, status_code=status.HTTP_201_CREATED)
+@public_router.post("/", response_model=AccessRequestPublic, status_code=status.HTTP_201_CREATED)
 async def submit_access_request(request_data: AccessRequestCreate, db=Depends(get_database)):
     """Public endpoint for users to request access to the system"""
     request_dict = await access_request_service.create_access_request(db, request_data)
