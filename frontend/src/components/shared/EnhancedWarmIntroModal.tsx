@@ -403,6 +403,13 @@ ${emailLine}`;
         duration: 5000,
       });
       
+      // Open email client
+      const emailBody = generateEmailContent();
+      const subject = encodeURIComponent(`Intro to ${targetFirstName} ${targetLastName}`);
+      const encodedBody = encodeURIComponent(emailBody);
+      const mailtoUrl = `mailto:ha@nextstepfwd.com?subject=${subject}&body=${encodedBody}`;
+      window.open(mailtoUrl, '_blank');
+
       // Call success callback to handle return to search results
       onSuccess();
       
@@ -425,7 +432,7 @@ ${emailLine}`;
     } finally {
       setIsSubmitting(false);
     }
-  }, [requesterName, targetFirstName, targetLastName, token, toast, onSuccess, onClose]);
+  }, [requesterName, targetFirstName, targetLastName, token, toast, onSuccess, onClose, reason, about, includeEmail, email, linkedinUrl, requesterLinkedIn]);
 
   // Copy email content to clipboard
   const handleCopyEmail = useCallback(async () => {

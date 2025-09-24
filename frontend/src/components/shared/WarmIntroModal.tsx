@@ -239,7 +239,7 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
     setTouched(prev => ({ ...prev, [field]: true }));
   };
 
-  const handleChipClick = (chip: typeof QUICK_CHIPS[0]) => {
+  const handleChipClick = (chip: { label: string; text: string; }) => {
     const existingLength = reason.length;
     setReason(prev => prev + chip.text);
     telemetry.track('quick_chip_used', {
@@ -276,8 +276,7 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
 
   const handleSubmit = useCallback(async () => {
     if (!isFormValid) {
-      // Focus first invalid field
-      const firstError = Object.keys(errors)[0];
+      const firstError = Object.keys(errors);
       if (firstError) {
         document.getElementById(firstError)?.focus();
         document.getElementById(firstError)?.scrollIntoView({ behavior: 'smooth' });
@@ -296,211 +295,86 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
     });
 
     try {
-      // Create the email content
+      // Step 1: Create the WarmIntroRequest record in the database first
+      await createWarmIntroRequest(
+        requesterName,
+        `${targetFirstName} ${targetLastName}`,
+        WarmIntroStatus.pending,
+        token!
+      );
+
+      telemetry.track('warm_intro_request_created', {
+        requester_name: requesterName,
+        connection_name: `${targetFirstName} ${targetLastName}`,
+        creation_method: 'success',
+      });
+
+      // Step 2: If the request is successfully created, then open the email client
       const subject = encodeURIComponent(`Intro to ${targetFirstName} ${targetLastName}`);
-      
       const targetInfo = `${targetFirstName} ${targetLastName}`;
       const targetLinkedInLine = linkedinUrl ? `LinkedIn: ${linkedinUrl}` : '';
       const requesterLinkedInLine = requesterLinkedIn ? `LinkedIn: ${requesterLinkedIn}` : '';
       const emailLine = includeEmail && email ? `Email: ${email}` : '';
       
-      const emailBody = `Hi Ha,
-
-Thank you for offering to make an introduction to ${targetInfo}.
-${targetLinkedInLine}
-
-${reason}
-
-${about}
-
-Thanks again for helping connect us — I truly appreciate it.
-
-Regards,
-${requesterName}
-${requesterLinkedInLine}
-${emailLine}`;
-
+      const emailBody = `Hi Ha,\n\nThank you for offering to make an introduction to ${targetInfo}.\n${targetLinkedInLine}\n\n${reason}\n\n${about}\n\nThanks again for helping connect us — I truly appreciate it.\n\nRegards,\n${requesterName}\n${requesterLinkedInLine}\n${emailLine}`;
       const encodedBody = encodeURIComponent(emailBody);
       const mailtoUrl = `mailto:ha@nextstepfwd.com?subject=${subject}&body=${encodedBody}`;
+
+      // Use window.open as the primary method
+      const emailWindow = window.open(mailtoUrl, '_blank');
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Try multiple methods to open email client
-      let emailOpened = false;
-      
-      // Method 1: Try creating a temporary link and clicking it (most reliable)
-      try {
-        const tempLink = document.createElement('a');
-        tempLink.href = mailtoUrl;
-        tempLink.style.display = 'none';
-        document.body.appendChild(tempLink);
-        tempLink.click();
-        document.body.removeChild(tempLink);
-        emailOpened = true;
+      if (emailWindow) {
         telemetry.track('email_client_opened', {
-          method: 'link_click',
+          method: 'window_open',
           email_length: emailBody.length,
         });
-      } catch (e) {
-        console.warn('Link click method failed:', e);
-      }
-      
-      // Method 2: Fallback to window.location if link click failed
-      if (!emailOpened) {
-        try {
-          window.location.href = mailtoUrl;
-          emailOpened = true;
-          telemetry.track('email_client_opened', {
-            method: 'location_href',
-            email_length: emailBody.length,
-          });
-        } catch (e) {
-          console.warn('Location href method failed:', e);
-        }
-      }
-      
-      // Method 3: Final fallback to window.open
-      if (!emailOpened) {
-        try {
-          const emailWindow = window.open(mailtoUrl, '_blank');
-          if (emailWindow) {
-            emailOpened = true;
-            telemetry.track('email_client_opened', {
-              method: 'window_open',
-              email_length: emailBody.length,
-            });
-          }
-        } catch (e) {
-          console.warn('Window open method failed:', e);
-        }
-      }
-
-      if (emailOpened) {
-        // Create WarmIntroRequest record in database
-        try {
-          await createWarmIntroRequest(
-            requesterName,
-            `${targetFirstName} ${targetLastName}`,
-            WarmIntroStatus.pending,
-            token!
-          );
-          telemetry.track('warm_intro_request_created', {
-            requester_name: requesterName,
-            connection_name: `${targetFirstName} ${targetLastName}`,
-            creation_method: 'success',
-          });
-        } catch (dbError) {
-          // Log the error but don't fail the entire flow since email was sent successfully
-          console.error('Failed to create WarmIntroRequest record:', dbError);
-          telemetry.track('warm_intro_request_creation_failed', {
-            error_type: typeof dbError === 'object' && dbError ? dbError.constructor.name : 'unknown',
-            requester_name: requesterName,
-            connection_name: `${targetFirstName} ${targetLastName}`,
-          });
-          
-          // Show a non-blocking warning toast
-          toast({
-            title: "Request logged with warning",
-            description: "Your email was sent successfully, but we couldn't save the request to our database. The intro request is still valid.",
-            variant: "default",
-            duration: 4000,
-          });
-        }
-        
-        // Show success toast and close modal
         toast({
-          title: "Email client opened!",
-          description: `Your email client should now be open with the warm intro request for ${targetFirstName}. If it didn't open, please check your browser's popup settings or default email client configuration.`,
+          title: "Request Submitted!",
+          description: `Your email client should now be open. Please send the email to finalize the intro request for ${targetFirstName}.`,
           duration: 6000,
         });
-        
-        // Close modal and reset form
-        onClose();
-        resetForm();
       } else {
-        // If all methods failed, show fallback options
-        // Create WarmIntroRequest record in database even for fallback case
-        try {
-          await createWarmIntroRequest(
-            requesterName,
-            `${targetFirstName} ${targetLastName}`,
-            WarmIntroStatus.pending,
-            token!
-          );
-          telemetry.track('warm_intro_request_created', {
-            requester_name: requesterName,
-            connection_name: `${targetFirstName} ${targetLastName}`,
-            creation_method: 'fallback',
-          });
-        } catch (dbError) {
-          // Log the error but don't fail the entire flow
-          console.error('Failed to create WarmIntroRequest record (fallback):', dbError);
-          telemetry.track('warm_intro_request_creation_failed', {
-            error_type: typeof dbError === 'object' && dbError ? dbError.constructor.name : 'unknown',
-            requester_name: requesterName,
-            connection_name: `${targetFirstName} ${targetLastName}`,
-          });
-        }
-        
+        // Fallback if window.open is blocked
+        telemetry.track('email_fallback_used', {
+          fallback_method: 'clipboard',
+          email_length: emailBody.length,
+        });
         // Copy email content to clipboard as fallback
         try {
-          const fullEmailContent = `To: ha@nextstepfwd.com
-Subject: ${decodeURIComponent(subject)}
-
-${emailBody}`;
-          
+          const fullEmailContent = `To: ha@nextstepfwd.com\nSubject: ${decodeURIComponent(subject)}\n\n${emailBody}`;
           await navigator.clipboard.writeText(fullEmailContent);
-          
           toast({
             title: "Email content copied!",
-            description: "We couldn't open your email client automatically, but we've copied the email content to your clipboard. Please paste it into your email client manually.",
+            description: "We couldn't open your email client automatically, but we've copied the email content to your clipboard. Please paste it into your email client to continue.",
             duration: 8000,
-          });
-          
-          telemetry.track('email_fallback_used', {
-            fallback_method: 'clipboard',
-            email_length: fullEmailContent.length,
           });
         } catch {
-          // If clipboard also fails, show the email content in a modal or alert
+          // If clipboard also fails, show the email content in an alert
           const emailContent = `To: ha@nextstepfwd.com\nSubject: ${decodeURIComponent(subject)}\n\n${emailBody}`;
-          
-          // Show alert with email content
           alert(`Please copy this email content and send it manually:\n\n${emailContent}`);
-          
-          toast({
-            title: "Manual email required",
-            description: "Please copy the email content from the alert and send it manually to ha@nextstepfwd.com",
-            duration: 8000,
-          });
-          
-          telemetry.track('email_fallback_used', {
-            fallback_method: 'manual_alert',
-            email_length: emailContent.length,
-          });
         }
-        
-        // Still close modal and reset form
-        onClose();
-        resetForm();
       }
-      
+
+      // Close modal and reset form after successful submission and email client attempt
+      onClose();
+      resetForm();
+
     } catch (error) {
-      telemetry.trackCustom('submit_error', {
-        error_code: 'email_failed',
+      console.error('Failed to create WarmIntroRequest record:', error);
+      telemetry.track('warm_intro_request_creation_failed', {
         error_type: typeof error === 'object' && error ? error.constructor.name : 'unknown',
-        target_name: `${targetFirstName} ${targetLastName}`,
+        requester_name: requesterName,
+        connection_name: `${targetFirstName} ${targetLastName}`,
       });
       toast({
-        title: "Error",
-        description: "We encountered an error processing your request. Please try again or contact support.",
+        title: "Submission Error",
+        description: "We couldn't save your request to our database. Please try again.",
         variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
     }
-  }, [isFormValid, errors, requesterName, reason, about, includeEmail, email, targetFirstName, targetLastName, linkedinUrl, token, toast, onClose]);
+  }, [isFormValid, errors, requesterName, reason, about, includeEmail, email, targetFirstName, targetLastName, linkedinUrl, requesterLinkedIn, token, toast, onClose, resetForm]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -594,7 +468,7 @@ ${emailBody}`;
                 />
               ) : (
                 <span className="text-white font-semibold text-xs">
-                  {targetFirstName?.[0] || ''}{targetLastName?.[0] || ''}
+                  {targetFirstName?. || ''}{targetLastName?. || ''}
                 </span>
               )}
             </div>
