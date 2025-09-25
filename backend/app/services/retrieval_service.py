@@ -4,6 +4,7 @@ import asyncio
 import os
 import logging
 from typing import List, Dict, Any, Optional, Tuple
+import google.api_core.exceptions
 import google.generativeai as genai
 import httpx
 from pinecone import Pinecone
@@ -35,7 +36,7 @@ class RetrievalService:
         
         try:
             genai.configure(api_key=settings.GEMINI_API_KEY)
-            self.gemini_client = genai.GenerativeModel('gemini-1.5-pro-latest')
+            self.gemini_client = genai.GenerativeModel(model_name=settings.GEMINI_MODEL)
             print("Gemini client initialized successfully")
         except Exception as e:
             print(f"Error initializing Gemini client: {e}")
@@ -369,6 +370,14 @@ Example format:
                         logger.warning(f"Could not find profile data for profile_id: {result_profile_id}")
             return chunk_results
             
+        except google.api_core.exceptions.PermissionDenied as e:
+            if "billing" in str(e).lower() or "credits" in str(e).lower():
+                logger.error("Billing issue detected: You may have run out of credits.", exc_info=True)
+                # Optionally, re-raise a custom exception to be handled upstream
+                raise ValueError("Billing issue: Please check your account credits.") from e
+            else:
+                logger.error(f"Permission denied while processing chunk: {e}", exc_info=True)
+                return []
         except Exception as e:
             logger.error(f"Error processing chunk: {e}", exc_info=True)
             return []
