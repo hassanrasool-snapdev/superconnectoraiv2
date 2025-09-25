@@ -309,37 +309,39 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
 
       const emailWindow = window.open(mailtoUrl, '_blank');
 
-      if (!emailWindow) {
-        console.log('window.open was blocked or failed. Attempting fallback.');
-        telemetry.track('email_fallback_used', {
-          fallback_method: 'clipboard',
-          email_length: emailBody.length,
-        });
-        // Fallback to clipboard if window.open is blocked
-        try {
-          const fullEmailContent = `To: ha@nextstepfwd.com\nSubject: ${decodeURIComponent(subject)}\n\n${emailBody}`;
-          await navigator.clipboard.writeText(fullEmailContent);
-          toast({
-            title: "Email content copied!",
-            description: "We couldn't open your email client automatically, but we've copied the email content to your clipboard. Please paste it into your email client to continue.",
-            duration: 8000,
+      setTimeout(() => {
+        if (!document.hasFocus()) {
+          console.log('Email client window opened successfully via window.open.');
+          telemetry.track('email_client_opened', {
+            method: 'window_open',
+            email_length: emailBody.length,
           });
-        } catch {
-          const emailContent = `To: ha@nextstepfwd.com\nSubject: ${decodeURIComponent(subject)}\n\n${emailBody}`;
-          alert(`Please copy this email content and send it manually:\n\n${emailContent}`);
+          toast({
+            title: "Request Submitted!",
+            description: `Your email client should now be open. Please send the email to finalize the intro request for ${targetFirstName}.`,
+            duration: 6000,
+          });
+        } else {
+          console.log('window.open was blocked or failed. Attempting fallback.');
+          telemetry.track('email_fallback_used', {
+            fallback_method: 'clipboard',
+            email_length: emailBody.length,
+          });
+          // Fallback to clipboard if window.open is blocked
+          try {
+            const fullEmailContent = `To: ha@nextstepfwd.com\nSubject: ${decodeURIComponent(subject)}\n\n${emailBody}`;
+            navigator.clipboard.writeText(fullEmailContent);
+            toast({
+              title: "Email content copied!",
+              description: "We couldn't open your email client automatically, but we've copied the email content to your clipboard. Please paste it into your email client to continue.",
+              duration: 8000,
+            });
+          } catch {
+            const emailContent = `To: ha@nextstepfwd.com\nSubject: ${decodeURIComponent(subject)}\n\n${emailBody}`;
+            alert(`Please copy this email content and send it manually:\n\n${emailContent}`);
+          }
         }
-      } else {
-        console.log('Email client window opened successfully via window.open.');
-        telemetry.track('email_client_opened', {
-          method: 'window_open',
-          email_length: emailBody.length,
-        });
-        toast({
-          title: "Request Submitted!",
-          description: `Your email client should now be open. Please send the email to finalize the intro request for ${targetFirstName}.`,
-          duration: 6000,
-        });
-      }
+      }, 500);
 
       // Step 2: Create the WarmIntroRequest record in the database.
       // This now happens after attempting to open the email client.
@@ -361,7 +363,7 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
       resetForm();
 
     } catch (error) {
-      console.error('Failed to create WarmIntroRequest record:', error);
+      console.error('An error occurred during the warm intro request process:', error);
       telemetry.track('warm_intro_request_creation_failed', {
         error_type: typeof error === 'object' && error ? error.constructor.name : 'unknown',
         requester_name: requesterName,

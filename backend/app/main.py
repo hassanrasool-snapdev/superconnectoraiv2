@@ -5,7 +5,12 @@ from contextlib import asynccontextmanager
 from app.core.db import connect_to_mongo, close_mongo_connection
 from app.services.threading_service import threading_service
 from app.services.scheduler_service import start_scheduler, stop_scheduler
-from app.routers import auth, connections, search, saved_searches, search_history, favorites, embeddings, pinecone_index, retrieval, generated_emails, tips, warm_intro_requests, health, invitations, follow_up_emails, filter_options, public, access_requests
+from app.routers import (
+    auth, connections, search, saved_searches, search_history,
+    favorites, embeddings, pinecone_index, retrieval, generated_emails,
+    tips, warm_intro_requests, health, invitations, follow_up_emails,
+    filter_options, public, access_requests
+)
 
 # Get the logger used by Uvicorn
 uvicorn_error_logger = logging.getLogger("uvicorn.error")
@@ -26,15 +31,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# CORS Middleware
+# Updated CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://superconnectoraiv2-snax.vercel.app"],  # Allows frontend origins
+    allow_origins=[
+        "http://localhost:3000",
+        "https://superconnectoraiv2-snax.vercel.app",
+        "https://superconnectai.com",
+        "https://www.superconnectai.com"
+    ],  # Add all frontend origins here
     allow_credentials=True,  # Can be True when specific origins are listed
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],  # Allows all HTTP methods
+    allow_headers=["*"],  # Allows all HTTP headers
 )
 
+# Routers
 app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(connections.router, prefix="/api/v1", tags=["Connections"])
 app.include_router(search.router, prefix="/api/v1", tags=["Search"])
