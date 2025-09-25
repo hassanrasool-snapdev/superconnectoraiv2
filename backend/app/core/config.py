@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     PINECONE_REGION: str = os.getenv("PINECONE_REGION", "us-east-1")
     
     # Email Configuration
-    FROM_EMAIL: str = os.getenv("FROM_EMAIL", "noreply@superconnector.ai")
+    FROM_EMAIL: str = os.getenv("FROM_EMAIL", " ha@nextstepfwd.com")
     FROM_NAME: str = os.getenv("FROM_NAME", "Superconnector Team")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
