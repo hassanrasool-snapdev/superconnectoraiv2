@@ -276,10 +276,11 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
 
   const handleSubmit = useCallback(async () => {
     if (!isFormValid) {
-      const firstError = Object.keys(errors);
-      if (firstError) {
-        document.getElementById(firstError)?.focus();
-        document.getElementById(firstError)?.scrollIntoView({ behavior: 'smooth' });
+      const firstErrorKeys = Object.keys(errors);
+      if (firstErrorKeys.length > 0) {
+        const firstErrorId = firstErrorKeys;
+        document.getElementById(firstErrorId)?.focus();
+        document.getElementById(firstErrorId)?.scrollIntoView({ behavior: 'smooth' });
       }
       return;
     }
@@ -295,7 +296,53 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
     });
 
     try {
-      // Step 1: Create the WarmIntroRequest record in the database first
+      // Step 1: Open the email client immediately to avoid popup blockers.
+      const subject = encodeURIComponent(`Intro to ${targetFirstName} ${targetLastName}`);
+      const targetInfo = `${targetFirstName} ${targetLastName}`;
+      const targetLinkedInLine = linkedinUrl ? `LinkedIn: ${linkedinUrl}` : '';
+      const requesterLinkedInLine = requesterLinkedIn ? `LinkedIn: ${requesterLinkedIn}` : '';
+      const emailLine = includeEmail && email ? `Email: ${email}` : '';
+      
+      const emailBody = `Hi Ha,\n\nThank you for offering to make an introduction to ${targetInfo}.\n${targetLinkedInLine}\n\n${reason}\n\n${about}\n\nThanks again for helping connect us — I truly appreciate it.\n\nRegards,\n${requesterName}\n${requesterLinkedInLine}\n${emailLine}`;
+      const encodedBody = encodeURIComponent(emailBody);
+      const mailtoUrl = `mailto:ha@nextstepfwd.com?subject=${subject}&body=${encodedBody}`;
+
+      const emailWindow = window.open(mailtoUrl, '_blank');
+
+      if (!emailWindow) {
+        console.log('window.open was blocked or failed. Attempting fallback.');
+        telemetry.track('email_fallback_used', {
+          fallback_method: 'clipboard',
+          email_length: emailBody.length,
+        });
+        // Fallback to clipboard if window.open is blocked
+        try {
+          const fullEmailContent = `To: ha@nextstepfwd.com\nSubject: ${decodeURIComponent(subject)}\n\n${emailBody}`;
+          await navigator.clipboard.writeText(fullEmailContent);
+          toast({
+            title: "Email content copied!",
+            description: "We couldn't open your email client automatically, but we've copied the email content to your clipboard. Please paste it into your email client to continue.",
+            duration: 8000,
+          });
+        } catch {
+          const emailContent = `To: ha@nextstepfwd.com\nSubject: ${decodeURIComponent(subject)}\n\n${emailBody}`;
+          alert(`Please copy this email content and send it manually:\n\n${emailContent}`);
+        }
+      } else {
+        console.log('Email client window opened successfully via window.open.');
+        telemetry.track('email_client_opened', {
+          method: 'window_open',
+          email_length: emailBody.length,
+        });
+        toast({
+          title: "Request Submitted!",
+          description: `Your email client should now be open. Please send the email to finalize the intro request for ${targetFirstName}.`,
+          duration: 6000,
+        });
+      }
+
+      // Step 2: Create the WarmIntroRequest record in the database.
+      // This now happens after attempting to open the email client.
       await createWarmIntroRequest(
         requesterName,
         `${targetFirstName} ${targetLastName}`,
@@ -308,52 +355,6 @@ const WarmIntroModal: React.FC<WarmIntroModalProps> = ({
         connection_name: `${targetFirstName} ${targetLastName}`,
         creation_method: 'success',
       });
-
-      // Step 2: If the request is successfully created, then open the email client
-      const subject = encodeURIComponent(`Intro to ${targetFirstName} ${targetLastName}`);
-      const targetInfo = `${targetFirstName} ${targetLastName}`;
-      const targetLinkedInLine = linkedinUrl ? `LinkedIn: ${linkedinUrl}` : '';
-      const requesterLinkedInLine = requesterLinkedIn ? `LinkedIn: ${requesterLinkedIn}` : '';
-      const emailLine = includeEmail && email ? `Email: ${email}` : '';
-      
-      const emailBody = `Hi Ha,\n\nThank you for offering to make an introduction to ${targetInfo}.\n${targetLinkedInLine}\n\n${reason}\n\n${about}\n\nThanks again for helping connect us — I truly appreciate it.\n\nRegards,\n${requesterName}\n${requesterLinkedInLine}\n${emailLine}`;
-      const encodedBody = encodeURIComponent(emailBody);
-      const mailtoUrl = `mailto:ha@nextstepfwd.com?subject=${subject}&body=${encodedBody}`;
-
-      // Use window.open as the primary method
-      const emailWindow = window.open(mailtoUrl, '_blank');
-      
-      if (emailWindow) {
-        telemetry.track('email_client_opened', {
-          method: 'window_open',
-          email_length: emailBody.length,
-        });
-        toast({
-          title: "Request Submitted!",
-          description: `Your email client should now be open. Please send the email to finalize the intro request for ${targetFirstName}.`,
-          duration: 6000,
-        });
-      } else {
-        // Fallback if window.open is blocked
-        telemetry.track('email_fallback_used', {
-          fallback_method: 'clipboard',
-          email_length: emailBody.length,
-        });
-        // Copy email content to clipboard as fallback
-        try {
-          const fullEmailContent = `To: ha@nextstepfwd.com\nSubject: ${decodeURIComponent(subject)}\n\n${emailBody}`;
-          await navigator.clipboard.writeText(fullEmailContent);
-          toast({
-            title: "Email content copied!",
-            description: "We couldn't open your email client automatically, but we've copied the email content to your clipboard. Please paste it into your email client to continue.",
-            duration: 8000,
-          });
-        } catch {
-          // If clipboard also fails, show the email content in an alert
-          const emailContent = `To: ha@nextstepfwd.com\nSubject: ${decodeURIComponent(subject)}\n\n${emailBody}`;
-          alert(`Please copy this email content and send it manually:\n\n${emailContent}`);
-        }
-      }
 
       // Close modal and reset form after successful submission and email client attempt
       onClose();
