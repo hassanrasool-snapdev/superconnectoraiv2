@@ -643,3 +643,30 @@ async def skip_follow_up_email(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to skip follow-up email: {str(e)}"
         )
+
+@router.get("/pending/count", response_model=int)
+async def get_pending_follow_up_emails_count(
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    """Get count of pending follow-up emails (scheduled status)"""
+    try:
+        # Only admin users can view pending follow-up email counts
+        if current_user.get("role") != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admin users can view pending follow-up email counts"
+            )
+        
+        # Count follow-up emails with "scheduled" status (which is pending)
+        count = await db.follow_up_emails.count_documents({"status": "scheduled"})
+        return count
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting pending follow-up emails count: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get pending follow-up emails count: {str(e)}"
+        )

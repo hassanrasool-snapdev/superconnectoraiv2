@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { AutoExpandingTextarea } from '@/components/ui/auto-expanding-textarea';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '../../../src/components/ui/badge';
-import { User, Linkedin, Loader2, X, Mail, Bell, Clock } from 'lucide-react';
+import { User, Linkedin, Loader2, X, Mail, Clock } from 'lucide-react';
 import Image from 'next/image';
 import { EmailGenerationModal } from '@/components/shared/EmailGenerationModal';
 import { TippingModal } from '@/components/shared/TippingModal';
@@ -38,10 +38,6 @@ export default function DashboardPage() {
   const [persistedResults, setPersistedResults] = useState<SearchResult[]>([]);
   const [persistedQuery, setPersistedQuery] = useState('');
   const [filtersChanged, setFiltersChanged] = useState(false);
-  const [followUpCandidates, setFollowUpCandidates] = useState<number>(0);
-  const [followUpDismissed, setFollowUpDismissed] = useState(false);
-  const [pendingAccessRequests, setPendingAccessRequests] = useState<number>(0);
-  const [accessRequestsDismissed, setAccessRequestsDismissed] = useState(false);
   
   // Mock facilitator profile - in a real app, this would come from the user's profile
   const facilitatorProfile = {
@@ -56,29 +52,6 @@ export default function DashboardPage() {
         .then(data => setConnectionsCount(data.count))
         .catch(err => console.error("Failed to fetch connections count:", err));
       
-      // Fetch follow-up candidates for admin users
-      if (user?.role === 'admin') {
-        fetch('/api/v1/follow-up-emails/admin/candidates', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-        .then(response => response.ok ? response.json() : [])
-        .then(data => setFollowUpCandidates(data.length || 0))
-        .catch(err => console.error("Failed to fetch follow-up candidates:", err));
-
-        // Fetch pending access requests for admin users
-        fetch('/api/v1/admin/access-requests?status=pending', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-        .then(response => response.ok ? response.json() : [])
-        .then(data => setPendingAccessRequests(data.length || 0))
-        .catch(err => console.error("Failed to fetch pending access requests:", err));
-      }
     }
   }, [token, user?.role]);
 
@@ -300,83 +273,6 @@ export default function DashboardPage() {
    return (
      <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-6 py-12">
-        {/* Follow-up Notification for Admin Users */}
-        {user?.role === 'admin' && followUpCandidates > 0 && !followUpDismissed && (
-          <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="flex-shrink-0">
-                  <Bell className="w-5 h-5 text-orange-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-sm font-medium text-orange-800">
-                    Follow-up Emails Needed
-                  </h3>
-                  <p className="text-sm text-orange-700">
-                    {followUpCandidates} warm intro request{followUpCandidates > 1 ? 's' : ''} {followUpCandidates > 1 ? 'are' : 'is'} 14+ days old and need{followUpCandidates === 1 ? 's' : ''} follow-up emails.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  size="sm"
-                  onClick={() => window.location.href = '/admin/follow-ups'}
-                  className="bg-orange-600 hover:bg-orange-700 text-white"
-                >
-                  <Mail className="w-4 h-4 mr-1" />
-                  Manage Follow-ups
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setFollowUpDismissed(true)}
-                  className="text-orange-600 hover:text-orange-800"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Access Requests Notification for Admin Users */}
-        {user?.role === 'admin' && pendingAccessRequests > 0 && !accessRequestsDismissed && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="flex-shrink-0">
-                  <User className="w-5 h-5 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-sm font-medium text-blue-800">
-                    Pending Access Requests
-                  </h3>
-                  <p className="text-sm text-blue-700">
-                    {pendingAccessRequests} access request{pendingAccessRequests > 1 ? 's' : ''} {pendingAccessRequests > 1 ? 'are' : 'is'} waiting for review.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  size="sm"
-                  onClick={() => window.location.href = '/access-requests'}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  <User className="w-4 h-4 mr-1" />
-                  Review Requests
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setAccessRequestsDismissed(true)}
-                  className="text-blue-600 hover:text-blue-800"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Header */}
         <div className="text-center mb-12">

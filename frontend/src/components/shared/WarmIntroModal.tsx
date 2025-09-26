@@ -326,54 +326,20 @@ ${emailLine}`;
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Try multiple methods to open email client
+      // Use the same simple approach as access requests - just use window.open
       let emailOpened = false;
       
-      // Method 1: Try creating a temporary link and clicking it (most reliable)
       try {
-        const tempLink = document.createElement('a');
-        tempLink.href = mailtoUrl;
-        tempLink.style.display = 'none';
-        document.body.appendChild(tempLink);
-        tempLink.click();
-        document.body.removeChild(tempLink);
-        emailOpened = true;
-        telemetry.track('email_client_opened', {
-          method: 'link_click',
-          email_length: emailBody.length,
-        });
-      } catch (e) {
-        console.warn('Link click method failed:', e);
-      }
-      
-      // Method 2: Fallback to window.location if link click failed
-      if (!emailOpened) {
-        try {
-          window.location.href = mailtoUrl;
+        const emailWindow = window.open(mailtoUrl, '_blank');
+        if (emailWindow) {
           emailOpened = true;
           telemetry.track('email_client_opened', {
-            method: 'location_href',
+            method: 'window_open',
             email_length: emailBody.length,
           });
-        } catch (e) {
-          console.warn('Location href method failed:', e);
         }
-      }
-      
-      // Method 3: Final fallback to window.open
-      if (!emailOpened) {
-        try {
-          const emailWindow = window.open(mailtoUrl, '_blank');
-          if (emailWindow) {
-            emailOpened = true;
-            telemetry.track('email_client_opened', {
-              method: 'window_open',
-              email_length: emailBody.length,
-            });
-          }
-        } catch (e) {
-          console.warn('Window open method failed:', e);
-        }
+      } catch (e) {
+        console.warn('Window open method failed:', e);
       }
 
       if (emailOpened) {

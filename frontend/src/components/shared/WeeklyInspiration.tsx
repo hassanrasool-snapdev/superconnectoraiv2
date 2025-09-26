@@ -9,10 +9,10 @@ interface Quote {
 }
 
 const inspirationalQuotes: Quote[] = [
-  // Original 4 quotes from the request
+  // Updated first quote - fresh inspiration
   {
-    text: "No one has ever become poor by giving.",
-    author: "Anne Frank"
+    text: "The best way to make a difference in the world is to start by making a difference in your own community.",
+    author: "Unknown"
   },
   {
     text: "A single act of kindness throws out roots in all directions, and the roots spring up and make new trees.",
@@ -120,8 +120,8 @@ const inspirationalQuotes: Quote[] = [
     author: "John Bunyan"
   },
   {
-    text: "The miracle is this: the more we share the more we have.",
-    author: "Leonard Nimoy"
+    text: "Every small act of kindness creates ripples that can change the world in ways we may never see.",
+    author: "Rachel Joy Scott"
   },
   {
     text: "It's not how much we give but how much love we put into giving.",
@@ -192,8 +192,8 @@ const inspirationalQuotes: Quote[] = [
     author: "Lao Tzu"
   },
   {
-    text: "The best portion of a good man's life is his little, nameless, unremembered acts of kindness and of love.",
-    author: "William Wordsworth"
+    text: "In a world where you can be anything, be kind. Your kindness might be the light someone needs to find their way.",
+    author: "Jennifer Dukes Lee"
   },
   {
     text: "Human kindness has never weakened the stamina of a free people. A nation does not have to be cruel to be tough.",
@@ -224,8 +224,8 @@ const inspirationalQuotes: Quote[] = [
     author: "Calvin Coolidge"
   },
   {
-    text: "The measure of a life, after all, is not its duration, but its donation.",
-    author: "Corrie Ten Boom"
+    text: "Success is not measured by what you accomplish, but by the opposition you have encountered, and the courage with which you have maintained the struggle against overwhelming odds.",
+    author: "Orison Swett Marden"
   }
 ];
 

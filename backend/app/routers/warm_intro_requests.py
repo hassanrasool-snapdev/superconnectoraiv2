@@ -53,6 +53,7 @@ class PaginatedWarmIntroRequestsResponse(BaseModel):
     page: int
     limit: int
     total_pages: int
+    status_counts: dict = {}
 
 @router.post("/warm-intro-requests/", response_model=WarmIntroRequestResponse, status_code=status.HTTP_201_CREATED)
 async def create_warm_intro_request(
@@ -149,7 +150,8 @@ async def get_warm_intro_requests(
             total=result["total"],
             page=result["page"],
             limit=result["limit"],
-            total_pages=result["total_pages"]
+            total_pages=result["total_pages"],
+            status_counts=result["status_counts"]
         )
     except Exception as e:
         raise HTTPException(

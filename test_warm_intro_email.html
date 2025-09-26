@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Warm Intro Email Opening</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+            display: block;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .test-info {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Warm Intro Email Test</h1>
+        
+        <div class="test-info">
+            <h3>Test Purpose:</h3>
+            <p>This test verifies that the warm intro email functionality works consistently in both local and production environments using the same simple approach as the access request approve/deny buttons.</p>
+        </div>
+
+        <h3>Test Scenarios:</h3>
+        
+        <button onclick="testOriginalMethod()">Test Original Complex Method (Old)</button>
+        <div id="original-result"></div>
+        
+        <button onclick="testSimpleMethod()">Test Simple Method (New Fix)</button>
+        <div id="simple-result"></div>
+        
+        <button onclick="testAccessRequestMethod()">Test Access Request Method (Reference)</button>
+        <div id="access-result"></div>
+
+        <div class="test-info" style="margin-top: 30px;">
+            <h3>Expected Results:</h3>
+            <ul>
+                <li><strong>Simple Method (New Fix):</strong> Should open email client consistently in both local and production</li>
+                <li><strong>Access Request Method:</strong> Should work the same as Simple Method</li>
+                <li><strong>Original Method:</strong> May fail in production due to popup blockers</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function createEmailContent() {
+            const subject = encodeURIComponent('Intro to John Doe');
+            const emailBody = `Hi Ha,
+
+Thank you for offering to make an introduction to John Doe.
+LinkedIn: https://linkedin.com/in/johndoe
+
+I am exploring pilots for an AI-powered customer support tool for retail. I would value your perspective on rollout pitfalls.
+
+I led CS Ops at Sam's Club and recently shipped a triage workflow with 18 percent faster resolution. If helpful, I can share a brief teardown of your public help center and offer to guest share our findings with your team.
+
+Thanks again for helping connect us — I truly appreciate it.
+
+Regards,
+Test User
+LinkedIn: https://linkedin.com/in/testuser`;
+            
+            const encodedBody = encodeURIComponent(emailBody);
+            return `mailto:ha@nextstepfwd.com?subject=${subject}&body=${encodedBody}`;
+        }
+
+        function showResult(elementId, success, message) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="test-info ${success ? 'success' : 'error'}" style="margin-top: 10px;">
+                <strong>${success ? 'SUCCESS' : 'FAILED'}:</strong> ${message}
+            </div>`;
+        }
+
+        function testOriginalMethod() {
+            const mailtoUrl = createEmailContent();
+            let emailOpened = false;
+            
+            try {
+                // Method 1: Try creating a temporary link and clicking it
+                const tempLink = document.createElement('a');
+                tempLink.href = mailtoUrl;
+                tempLink.style.display = 'none';
+                document.body.appendChild(tempLink);
+                tempLink.click();
+                document.body.removeChild(tempLink);
+                emailOpened = true;
+                showResult('original-result', true, 'Original complex method worked - email client should have opened');
+            } catch (e) {
+                console.warn('Original method failed:', e);
+                showResult('original-result', false, `Original method failed: ${e.message}`);
+            }
+        }
+
+        function testSimpleMethod() {
+            const mailtoUrl = createEmailContent();
+            let emailOpened = false;
+            
+            try {
+                // Simple method: Just use window.open (same as access requests)
+                const emailWindow = window.open(mailtoUrl, '_blank');
+                if (emailWindow) {
+                    emailOpened = true;
+                    showResult('simple-result', true, 'Simple method worked - email client should have opened');
+                } else {
+                    showResult('simple-result', false, 'Simple method failed - popup may have been blocked');
+                }
+            } catch (e) {
+                console.warn('Simple method failed:', e);
+                showResult('simple-result', false, `Simple method failed: ${e.message}`);
+            }
+        }
+
+        function testAccessRequestMethod() {
+            // Simulate the exact same approach used in access requests
+            const emailTemplate = {
+                to: 'ha@nextstepfwd.com',
+                subject: 'Intro to John Doe',
+                body: `Hi Ha,
+
+Thank you for offering to make an introduction to John Doe.
+LinkedIn: https://linkedin.com/in/johndoe
+
+I am exploring pilots for an AI-powered customer support tool for retail. I would value your perspective on rollout pitfalls.
+
+I led CS Ops at Sam's Club and recently shipped a triage workflow with 18 percent faster resolution. If helpful, I can share a brief teardown of your public help center and offer to guest share our findings with your team.
+
+Thanks again for helping connect us — I truly appreciate it.
+
+Regards,
+Test User
+LinkedIn: https://linkedin.com/in/testuser`
+            };
+            
+            try {
+                const { to, subject, body } = emailTemplate;
+                const mailtoLink = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                window.open(mailtoLink, '_blank');
+                showResult('access-result', true, 'Access request method worked - email client should have opened');
+            } catch (e) {
+                console.warn('Access request method failed:', e);
+                showResult('access-result', false, `Access request method failed: ${e.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

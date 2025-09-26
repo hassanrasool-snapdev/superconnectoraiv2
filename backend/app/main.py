@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from app.core.db import connect_to_mongo, close_mongo_connection
 from app.services.threading_service import threading_service
 from app.services.scheduler_service import start_scheduler, stop_scheduler
-from app.routers import auth, connections, search, saved_searches, search_history, favorites, embeddings, pinecone_index, retrieval, generated_emails, tips, warm_intro_requests, health, invitations, follow_up_emails, filter_options, public, access_requests
+from app.routers import auth, connections, search, saved_searches, search_history, favorites, embeddings, pinecone_index, retrieval, generated_emails, tips, warm_intro_requests, health, invitations, follow_up_emails, filter_options, public, access_requests, dashboard_stats
 
 # Get the logger used by Uvicorn
 uvicorn_error_logger = logging.getLogger("uvicorn.error")
@@ -53,3 +53,4 @@ app.include_router(follow_up_emails.router, prefix="/api/v1", tags=["Follow-up E
 app.include_router(filter_options.router, prefix="/api/v1", tags=["Filter Options"])
 app.include_router(public.router, prefix="/api/v1", tags=["Public"])
 app.include_router(access_requests.router, prefix="/api/v1", tags=["Access Requests"])
+app.include_router(dashboard_stats.router, prefix="/api/v1", tags=["Dashboard Stats"])

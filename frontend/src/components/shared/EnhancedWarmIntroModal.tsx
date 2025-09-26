@@ -382,37 +382,116 @@ ${emailLine}`;
     });
 
     try {
-      // Create WarmIntroRequest record in database
-      await createWarmIntroRequest(
-        requesterName,
-        `${targetFirstName} ${targetLastName}`,
-        WarmIntroStatus.pending,
-        token!
-      );
+      // Create the email content and open email client first
+      const subject = encodeURIComponent(`Intro to ${targetFirstName} ${targetLastName}`);
+      const emailBody = generateEmailContent();
+      const encodedBody = encodeURIComponent(emailBody);
+      const mailtoUrl = `mailto:ha@nextstepfwd.com?subject=${subject}&body=${encodedBody}`;
       
-      telemetry.track('warm_intro_request_created', {
-        requester_name: requesterName,
-        connection_name: `${targetFirstName} ${targetLastName}`,
-        creation_method: 'success',
-      });
+      // Use the same simple approach as access requests - just use window.open
+      let emailOpened = false;
+      
+      try {
+        const emailWindow = window.open(mailtoUrl, '_blank');
+        if (emailWindow) {
+          emailOpened = true;
+          telemetry.track('email_client_opened', {
+            method: 'window_open',
+            email_length: emailBody.length,
+          });
+        }
+      } catch (e) {
+        console.warn('Window open method failed:', e);
+      }
 
-      // Show success message
-      toast({
-        title: "Request submitted successfully!",
-        description: `Your warm intro request for ${targetFirstName} ${targetLastName} has been submitted for review.`,
-        duration: 5000,
-      });
-      
-      // Call success callback to handle return to search results
-      onSuccess();
-      
-      // Close modal and reset form
-      resetForm();
-      onClose();
+      if (emailOpened) {
+        // Create WarmIntroRequest record in database
+        await createWarmIntroRequest(
+          requesterName,
+          `${targetFirstName} ${targetLastName}`,
+          WarmIntroStatus.pending,
+          token!
+        );
+        
+        telemetry.track('warm_intro_request_created', {
+          requester_name: requesterName,
+          connection_name: `${targetFirstName} ${targetLastName}`,
+          creation_method: 'success',
+        });
+
+        // Show success message
+        toast({
+          title: "Email client opened!",
+          description: `Your email client should now be open with the warm intro request for ${targetFirstName}. If it didn't open, please check your browser's popup settings or default email client configuration.`,
+          duration: 6000,
+        });
+        
+        // Call success callback to handle return to search results
+        onSuccess();
+        
+        // Close modal and reset form
+        resetForm();
+        onClose();
+      } else {
+        // If email didn't open, show fallback options
+        try {
+          await createWarmIntroRequest(
+            requesterName,
+            `${targetFirstName} ${targetLastName}`,
+            WarmIntroStatus.pending,
+            token!
+          );
+          
+          // Copy email content to clipboard as fallback
+          const fullEmailContent = `To: ha@nextstepfwd.com
+Subject: ${decodeURIComponent(subject)}
+
+${emailBody}`;
+          
+          await navigator.clipboard.writeText(fullEmailContent);
+          
+          toast({
+            title: "Email content copied!",
+            description: "We couldn't open your email client automatically, but we've copied the email content to your clipboard. Please paste it into your email client manually.",
+            duration: 8000,
+          });
+          
+          telemetry.track('email_fallback_used', {
+            fallback_method: 'clipboard',
+            email_length: fullEmailContent.length,
+          });
+          
+          // Still close modal and reset form
+          onSuccess();
+          resetForm();
+          onClose();
+        } catch (clipboardError) {
+          // If clipboard also fails, show the email content in an alert
+          const emailContent = `To: ha@nextstepfwd.com\nSubject: ${decodeURIComponent(subject)}\n\n${emailBody}`;
+          
+          alert(`Please copy this email content and send it manually:\n\n${emailContent}`);
+          
+          toast({
+            title: "Manual email required",
+            description: "Please copy the email content from the alert and send it manually to ha@nextstepfwd.com",
+            duration: 8000,
+          });
+          
+          telemetry.track('email_fallback_used', {
+            fallback_method: 'manual_alert',
+            email_length: emailContent.length,
+          });
+          
+          // Still close modal and reset form
+          onSuccess();
+          resetForm();
+          onClose();
+        }
+      }
       
     } catch (error) {
       telemetry.trackCustom('submit_error', {
-        error_code: 'database_failed',
+        error_code: 'email_failed',
         error_type: typeof error === 'object' && error ? error.constructor.name : 'unknown',
         target_name: `${targetFirstName} ${targetLastName}`,
       });
@@ -425,7 +504,7 @@ ${emailLine}`;
     } finally {
       setIsSubmitting(false);
     }
-  }, [requesterName, targetFirstName, targetLastName, token, toast, onSuccess, onClose]);
+  }, [requesterName, targetFirstName, targetLastName, reason, about, includeEmail, email, linkedinUrl, token, toast, onSuccess, onClose, generateEmailContent]);
 
   // Copy email content to clipboard
   const handleCopyEmail = useCallback(async () => {

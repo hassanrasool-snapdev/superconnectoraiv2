@@ -24,6 +24,12 @@ export default function WarmIntroRequestsPage() {
   const [error, setError] = useState('');
   const [totalPages, setTotalPages] = useState(1);
   const [totalRequests, setTotalRequests] = useState(0);
+  const [statusCounts, setStatusCounts] = useState({
+    total: 0,
+    pending: 0,
+    connected: 0,
+    declined: 0
+  });
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [pageLoadTime] = useState<number>(Date.now());
   const [exportingCSV, setExportingCSV] = useState(false);
@@ -90,6 +96,7 @@ export default function WarmIntroRequestsPage() {
       setRequests(response.items);
       setTotalPages(response.total_pages);
       setTotalRequests(response.total);
+      setStatusCounts(response.status_counts);
       
       // Track successful data load
       telemetry.track('api_request_performance', {
@@ -465,7 +472,7 @@ export default function WarmIntroRequestsPage() {
           <CardHeader className="pb-1">
             <CardDescription>Pending</CardDescription>
             <CardTitle className="text-2xl text-yellow-600">
-              {requests.filter(r => r.status === WarmIntroStatus.pending).length}
+              {statusCounts.pending}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -473,7 +480,7 @@ export default function WarmIntroRequestsPage() {
           <CardHeader className="pb-1">
             <CardDescription>Approved</CardDescription>
             <CardTitle className="text-2xl text-green-600">
-              {requests.filter(r => r.status === WarmIntroStatus.connected).length}
+              {statusCounts.connected}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -481,7 +488,7 @@ export default function WarmIntroRequestsPage() {
           <CardHeader className="pb-1">
             <CardDescription>Denied</CardDescription>
             <CardTitle className="text-2xl text-red-600">
-              {requests.filter(r => r.status === WarmIntroStatus.declined).length}
+              {statusCounts.declined}
             </CardTitle>
           </CardHeader>
         </Card>

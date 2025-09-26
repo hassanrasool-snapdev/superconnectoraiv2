@@ -149,12 +149,20 @@ export interface WarmIntroRequest {
   declined_date?: string | null;
 }
 
+export interface WarmIntroStatusCounts {
+  total: number;
+  pending: number;
+  connected: number;
+  declined: number;
+}
+
 export interface PaginatedWarmIntroRequests {
   items: WarmIntroRequest[];
   total: number;
   page: number;
   limit: number;
   total_pages: number;
+  status_counts: WarmIntroStatusCounts;
 }
 
 // Access Request types

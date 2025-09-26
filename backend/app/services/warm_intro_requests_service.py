@@ -41,10 +41,10 @@ async def create_warm_intro_request(
     return warm_intro_request
 
 async def get_warm_intro_requests(
-    db, 
-    user_id: UUID, 
-    page: int = 1, 
-    limit: int = 10, 
+    db,
+    user_id: UUID,
+    page: int = 1,
+    limit: int = 10,
     status_filter: Optional[WarmIntroStatus] = None
 ) -> Dict:
     """
@@ -58,7 +58,7 @@ async def get_warm_intro_requests(
         status_filter: Optional status filter
     
     Returns:
-        Dict: Paginated results with items, total, page, limit, and total_pages
+        Dict: Paginated results with items, total, page, limit, total_pages, and status_counts
     """
     # Build query
     query = {"user_id": str(user_id)}
@@ -81,12 +81,16 @@ async def get_warm_intro_requests(
     # Calculate total pages
     total_pages = math.ceil(total / limit) if total > 0 else 1
     
+    # Get status counts for all requests (not just filtered ones)
+    status_counts = await get_warm_intro_request_counts(db, user_id)
+    
     return {
         "items": warm_intro_requests,
         "total": total,
         "page": page,
         "limit": limit,
-        "total_pages": total_pages
+        "total_pages": total_pages,
+        "status_counts": status_counts
     }
 
 async def get_warm_intro_request_by_id(

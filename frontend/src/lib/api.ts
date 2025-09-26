@@ -261,6 +261,7 @@ async function clearPineconeData(token: string): Promise<{ message: string }> {
 
 // Real authentication implementations
 export async function loginUser(email: string, password: string): Promise<{ access_token: string; token_type: string } | { reset_token: string; token_type: string }> {
+  console.log('loginUser called - timestamp:', new Date().toISOString());
   try {
     const formData = new FormData();
     formData.append('username', email);
@@ -271,13 +272,41 @@ export async function loginUser(email: string, password: string): Promise<{ acce
       body: formData,
     });
 
+    console.log('Response status:', response.status);
+    console.log('Response ok:', response.ok);
+
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      // For authentication errors, always try to get the detailed message
+      let errorMessage = 'Invalid email or password';
+      
+      try {
+        const responseText = await response.text();
+        console.log('Raw response text:', responseText);
+        
+        if (responseText) {
+          const errorData = JSON.parse(responseText);
+          console.log('Parsed error data:', errorData);
+          errorMessage = errorData.detail || errorMessage;
+        }
+      } catch (parseError) {
+        console.log('Failed to parse error response:', parseError);
+        // Use our default user-friendly message for auth errors
+        if (response.status === 401) {
+          errorMessage = 'Invalid email or password';
+        } else {
+          errorMessage = `HTTP error! status: ${response.status}`;
+        }
+      }
+      
+      console.log('Final error message:', errorMessage);
+      throw new Error(errorMessage);
     }
 
     return await response.json();
   } catch (error) {
-    return handleApiError(error, "loginUser");
+    console.log('Error in loginUser:', error);
+    // Don't use handleApiError for login errors to avoid additional processing
+    throw error;
   }
 }
 
@@ -931,6 +960,31 @@ export async function resetPassword(
     return await response.json();
   } catch (error) {
     return handleApiError(error, "resetPassword");
+  }
+}
+
+// Dashboard Stats API functions
+export async function getPendingCounts(token: string): Promise<{
+  warm_intro_requests: number;
+  follow_up_emails: number;
+  access_requests: number;
+}> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/dashboard/pending-counts`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    return handleApiError(error, "getPendingCounts");
   }
 }
 
