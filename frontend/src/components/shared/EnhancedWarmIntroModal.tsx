@@ -504,7 +504,7 @@ ${emailBody}`;
     } finally {
       setIsSubmitting(false);
     }
-  }, [requesterName, targetFirstName, targetLastName, reason, about, includeEmail, email, linkedinUrl, token, toast, onSuccess, onClose, generateEmailContent]);
+  }, [requesterName, targetFirstName, targetLastName, reason, about, includeEmail, email, linkedinUrl, token, toast, onSuccess, onClose, generateEmailContent, requesterLinkedIn]);
 
   // Copy email content to clipboard
   const handleCopyEmail = useCallback(async () => {
@@ -951,7 +951,7 @@ ${emailBody}`;
       {/* Footer */}
       <div className="pt-6 border-t border-gray-200 space-y-4">
         <p className="text-sm text-gray-800 font-medium bg-red-50 border border-red-200 rounded-lg p-3">
-          Copy and paste the body text above before clicking 'submit'. If an email doesn't launch paste the message into an email and send to ha@superconnect.ai
+          Copy and paste the body text above before clicking 'submit'. If an email doesn't launch paste the message into an email and send to  ha@nextstepfwd.com
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-end">
           <Button

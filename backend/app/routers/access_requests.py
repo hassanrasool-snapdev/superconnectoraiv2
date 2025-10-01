@@ -10,15 +10,16 @@ from app.models.user import UserWithOTP
 from app.core.db import get_database
 from app.services import access_request_service, auth_service
 
-router = APIRouter()
+router = APIRouter(prefix="/admin/access-requests", tags=["Access Requests"])
+public_router = APIRouter(prefix="/access-requests", tags=["Access Requests"])
 
-@router.post("/access-requests", response_model=AccessRequestPublic, status_code=status.HTTP_201_CREATED)
+@public_router.post("/", response_model=AccessRequestPublic, status_code=status.HTTP_201_CREATED)
 async def submit_access_request(request_data: AccessRequestCreate, db=Depends(get_database)):
     """Public endpoint for users to request access to the system"""
     request_dict = await access_request_service.create_access_request(db, request_data)
     return AccessRequestPublic(**request_dict)
 
-@router.get("/admin/access-requests", response_model=List[AccessRequestPublic])
+@router.get("/", response_model=List[AccessRequestPublic])
 async def get_access_requests(
     status_filter: Optional[AccessRequestStatus] = Query(None, description="Filter by status"),
     db=Depends(get_database),
@@ -28,7 +29,7 @@ async def get_access_requests(
     requests = await access_request_service.get_access_requests(db, status_filter)
     return [AccessRequestPublic(**req) for req in requests]
 
-@router.get("/admin/access-requests/{request_id}", response_model=AccessRequestPublic)
+@router.get("/{request_id}", response_model=AccessRequestPublic)
 async def get_access_request(
     request_id: str,
     db=Depends(get_database),
@@ -38,7 +39,7 @@ async def get_access_request(
     request = await access_request_service.get_access_request_by_id(db, request_id)
     return AccessRequestPublic(**request)
 
-@router.patch("/admin/access-requests/{request_id}")
+@router.patch("/{request_id}")
 async def update_access_request(
     request_id: str,
     update_data: AccessRequestUpdate,
@@ -60,7 +61,7 @@ async def update_access_request(
     
     return {"request": AccessRequestPublic(**updated_request).model_dump()}
 
-@router.post("/admin/access-requests/{request_id}/approve")
+@router.post("/{request_id}/approve")
 async def approve_access_request(
     request_id: str,
     db=Depends(get_database),
@@ -92,7 +93,7 @@ async def approve_access_request(
         "email_template": email_template
     }
 
-@router.get("/admin/access-requests/pending/count", response_model=int)
+@router.get("/pending/count", response_model=int)
 async def get_pending_access_requests_count(
     db=Depends(get_database),
     current_admin: dict = Depends(auth_service.get_current_admin_user)

@@ -35,7 +35,7 @@ app = FastAPI(lifespan=lifespan)
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://superconnectoraiv2-snax.vercel.app"],  # Allows frontend origins
+    allow_origins=["http://localhost:3000", "https://superconnectoraiv2-snax.vercel.app", "https://superconnectai.com", "https://www.superconnectai.com"],  # Allows frontend origins
     allow_credentials=True,  # Can be True when specific origins are listed
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
@@ -62,3 +62,4 @@ app.include_router(access_requests.router, prefix="/api/v1", tags=["Access Reque
 app.include_router(dashboard_stats.router, prefix="/api/v1", tags=["Dashboard Stats"])
 app.include_router(last_search_results.router, prefix="/api/v1", tags=["Last Search Results"])
 app.include_router(user_preferences.router, prefix="/api/v1", tags=["User Preferences"])
+app.include_router(access_requests.public_router, prefix="/api/v1", tags=["Access Requests"])

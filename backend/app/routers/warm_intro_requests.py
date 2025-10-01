@@ -279,7 +279,7 @@ async def update_warm_intro_request_status(
                     requester_email=current_user.email,
                     requester_name=updated_request.requester_name,
                     connection_name=updated_request.connection_name,
-                    facilitator_email="ha@superconnect.ai",  # Default facilitator email
+                    facilitator_email=" ha@nextstepfwd.com",  # Default facilitator email
                     follow_up_days=14  # Default 14 days
                 )
             except Exception as e:

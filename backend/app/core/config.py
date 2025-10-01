@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     GEMINI_GENERATION_MODEL: str = os.getenv("GEMINI_GENERATION_MODEL", "gemini-2.5-flash-lite")
     GEMINI_EMBEDDING_MODEL: str = os.getenv("GEMINI_EMBEDDING_MODEL", "text-embedding-004")
     
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+    
     # Pinecone Configuration
     PINECONE_API_KEY: str = os.getenv("PINECONE_API_KEY", "")
     PINECONE_INDEX_NAME: str = os.getenv("PINECONE_INDEX_NAME", "profile-embeddings")
@@ -31,7 +33,7 @@ class Settings(BaseSettings):
     PINECONE_REGION: str = os.getenv("PINECONE_REGION", "us-east-1")
     
     # Email Configuration
-    FROM_EMAIL: str = os.getenv("FROM_EMAIL", "noreply@superconnector.ai")
+    FROM_EMAIL: str = os.getenv("FROM_EMAIL", " ha@nextstepfwd.com")
     FROM_NAME: str = os.getenv("FROM_NAME", "Superconnector Team")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     
