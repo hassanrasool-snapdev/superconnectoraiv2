@@ -95,3 +95,8 @@ pids
 *.seed
 *.pid.lock
 backend/.venv
+backend/.python-version
+backend/main.py
+backend/pyproject.toml
+backend/uv.lock
+backend/README.md
