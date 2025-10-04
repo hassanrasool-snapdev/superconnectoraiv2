@@ -6,8 +6,9 @@ import tempfile
 
 from app.services.auth_service import get_current_user
 from app.services import connections_service
-from app.services.embeddings_service import embeddings_service
+from app.services.gemini_embeddings_service import gemini_embeddings_service as embeddings_service
 from app.models.connection import ConnectionPublic
+from app.models.user import UserPublic
 from app.core.db import get_database
 
 router = APIRouter()
@@ -43,13 +44,13 @@ async def process_embeddings_background(csv_file_path: str, user_id: str):
 async def upload_connections(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user),
+    current_user: UserPublic = Depends(get_current_user),
     db = Depends(get_database)
 ):
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Invalid file type. Please upload a CSV.")
     
-    user_id = UUID(current_user["id"])
+    user_id = current_user.id
     
     # Process CSV upload to database first
     count = await connections_service.process_and_store_connections(db, file, user_id)
@@ -78,10 +79,10 @@ async def upload_connections(
 @router.post("/connections/ingest", status_code=status.HTTP_201_CREATED)
 async def ingest_connections(
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
+    current_user: UserPublic = Depends(get_current_user),
     db = Depends(get_database)
 ):
-    user_id = UUID(current_user["id"])
+    user_id = current_user.id
     
     # Construct path to data.csv, assuming it's in the backend directory
     # This makes the path relative to this file's location
@@ -116,19 +117,19 @@ async def ingest_connections(
     }
 @router.get("/connections", response_model=List[ConnectionPublic])
 async def get_connections(
-    current_user: dict = Depends(get_current_user),
+    current_user: UserPublic = Depends(get_current_user),
     db = Depends(get_database),
     page: int = Query(1, ge=1),
     limit: int = Query(100, ge=1, le=1000),
     min_rating: Optional[int] = Query(None, ge=1, le=10)
 ):
-    user_id = UUID(current_user["id"])
+    user_id = current_user.id
     connections = await connections_service.get_user_connections(db, user_id, page, limit, min_rating)
     return connections
 
 @router.get("/connections/count")
 async def get_connections_count(
-    current_user: dict = Depends(get_current_user),
+    current_user: UserPublic = Depends(get_current_user),
     db = Depends(get_database)
 ):
     user_id = current_user.id
@@ -137,9 +138,9 @@ async def get_connections_count(
 
 @router.delete("/connections", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_connections(
-    current_user: dict = Depends(get_current_user),
+    current_user: UserPublic = Depends(get_current_user),
     db = Depends(get_database)
 ):
-    user_id = UUID(current_user["id"])
+    user_id = current_user.id
     await connections_service.delete_user_connections(db, user_id)
     return

@@ -26,7 +26,7 @@ export default function DataManagementPage() {
     setUploading(true);
     setMessage('');
     try {
-      const response = await uploadConnectionsCSV(file);
+      const response = await uploadConnectionsCSV(file, token);
       setMessage(response.message);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Upload failed');

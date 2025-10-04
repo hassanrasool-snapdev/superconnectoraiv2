@@ -17,7 +17,7 @@ class PineconeIndexService:
         
         # Index configuration as specified in requirements
         self.index_config = {
-            "dimension": 1536,  # For text-embedding-3-small model
+            "dimension": 768,  # For Gemini text-embedding-004 model
             "metric": "cosine",
             "spec": ServerlessSpec(
                 cloud=settings.PINECONE_CLOUD,
@@ -233,8 +233,8 @@ class PineconeIndexService:
         if result["success"]:
             print("\n✅ Pinecone index setup completed successfully!")
             print("\nIndex Features:")
-            print("- ✅ Serverless configuration (AWS us-west-2)")
-            print("- ✅ Dimension: 1536 (compatible with text-embedding-3-small)")
+            print("- ✅ Serverless configuration (AWS us-east-1)")
+            print("- ✅ Dimension: 768 (compatible with Gemini text-embedding-004)")
             print("- ✅ Metric: cosine similarity")
             print("- ✅ Hybrid search support (dense + sparse vectors)")
             print("- ✅ Metadata filtering enabled")

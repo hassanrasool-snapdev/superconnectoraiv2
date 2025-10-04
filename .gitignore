@@ -37,7 +37,6 @@ lerna-debug.log*
 
 # Local env files
 .env*.local
-.env
 .env.development.local
 .env.test.local
 .env.production.local
@@ -100,3 +99,4 @@ backend/main.py
 backend/pyproject.toml
 backend/uv.lock
 backend/README.md
+config.bat

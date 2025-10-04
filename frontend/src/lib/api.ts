@@ -179,14 +179,18 @@ export async function getWarmIntroRequestById(
   }
 }
 
-async function uploadConnectionsCSV(file: File): Promise<{ message: string; uploaded_count: number }> {
+async function uploadConnectionsCSV(file: File, token: string): Promise<{ message: string; uploaded_count: number }> {
   try {
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await fetch(`/api/upload`, {
+    const response = await fetch(`${API_BASE_URL}/connections/upload`, {
       method: "POST",
       body: formData,
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        // Don't set Content-Type - browser will automatically set it with boundary
+      },
     });
 
     if (!response.ok) {
