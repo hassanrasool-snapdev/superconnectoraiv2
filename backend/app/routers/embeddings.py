@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel
-from app.services.embeddings_service import embeddings_service
+from app.services.gemini_embeddings_service import gemini_embeddings_service as embeddings_service
 from app.services.auth_service import get_current_user
 from app.models.user import UserInDB
 
