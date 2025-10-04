@@ -19,13 +19,26 @@ async def connect_to_mongo():
     """
     logger.info("Connecting to MongoDB with standard UUID representation...")
     try:
-        # Pass uuidRepresentation directly as a keyword argument
-        db.client = AsyncIOMotorClient(
-            settings.DATABASE_URL,
-            tls=True,
-            tlsAllowInvalidCertificates=True,
-            uuidRepresentation='standard'  # Use 'standard' for cross-language compatibility
-        )
+        # Determine if TLS should be used based on the connection string
+        # MongoDB Atlas and remote instances typically use mongodb+srv:// or require TLS
+        # Local instances typically don't need TLS
+        database_url = settings.DATABASE_URL or "mongodb://localhost:27017"
+        use_tls = database_url.startswith("mongodb+srv://") or database_url.startswith("mongodb://") and "mongodb.net" in database_url
+        
+        logger.info(f"Connecting to MongoDB at: {database_url.split('@')[-1] if '@' in database_url else database_url}")
+        logger.info(f"TLS enabled: {use_tls}")
+        
+        # Build connection parameters
+        connection_params = {
+            "uuidRepresentation": 'standard'  # Use 'standard' for cross-language compatibility
+        }
+        
+        # Only add TLS parameters if connecting to a remote instance
+        if use_tls:
+            connection_params["tls"] = True
+            connection_params["tlsAllowInvalidCertificates"] = True
+        
+        db.client = AsyncIOMotorClient(database_url, **connection_params)
         
         # The ismaster command is cheap and does not require auth.
         await db.client.admin.command('ismaster')
