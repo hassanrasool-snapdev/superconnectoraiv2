@@ -57,20 +57,34 @@ class GeminiEmbeddingsService:
             A single canonicalized text string for vectorization.
         """
         # Extract all relevant textual information from the row
+        # Handle fullName - construct from firstName and lastName if not available
+        # Try multiple variations of name columns
         full_name = str(row.get("fullName", "")).strip()
+        if not full_name:
+            # Try different name field variations
+            first_name = str(row.get("firstName", row.get("FirstName", row.get("First Name", "")))).strip()
+            last_name = str(row.get("lastName", row.get("LastName", row.get("Last Name", "")))).strip()
+            full_name = f"{first_name} {last_name}".strip()
+        
         headline = str(row.get("headline", "")).strip()
         about = str(row.get("about", "")).strip()
+        # Try to get description from either 'description' or 'Description/0'
+        description = str(row.get("description", row.get("Description/0", ""))).strip()
         experiences = str(row.get("experiences", "")).strip()
         education = str(row.get("education", "")).strip()
         skills = str(row.get("skills", "")).strip()
-        company_name = str(row.get("companyName", "")).strip()
-        location = f"{str(row.get('city', '')).strip()} {str(row.get('country', '')).strip()}".strip()
+        # Try multiple company name variations
+        company_name = str(row.get("companyName", row.get("CompanyName", row.get("Company", "")))).strip()
+        # Try multiple location field variations
+        city = str(row.get("city", row.get("City", ""))).strip()
+        country = str(row.get("country", row.get("Country", ""))).strip()
+        location = f"{city} {country}".strip()
 
         # Combine all fields into a comprehensive string
         combined_text = " ".join(filter(None, [
             full_name,
             headline,
-            about,
+            about if about else description,  # Use description if about is empty
             "Past Experience: " + experiences if experiences else "",
             "Education: " + education if education else "",
             "Skills: " + skills if skills else "",
@@ -315,26 +329,38 @@ class GeminiEmbeddingsService:
         # Define all possible profile fields and their conversion functions
         # This combines fields from the Connection model and observed CSV columns
         field_map = {
-            # Personal Info
+            # Personal Info (including multiple name variations)
             'fullName': to_str,
             'firstName': to_str,
+            'FirstName': to_str,
+            'First Name': to_str,
             'lastName': to_str,
+            'LastName': to_str,
+            'Last Name': to_str,
             'headline': to_str,
             'about': to_str,
             'description': to_str,
+            'Description/0': to_str,
             'city': to_str,
+            'City': to_str,
             'state': to_str,
+            'State': to_str,
             'country': to_str,
+            'Country': to_str,
             'location': to_str,
             'profilePicture': to_str,
             'publicIdentifier': to_str,
             'linkedin_url': to_str,
+            'LinkedinUrl': to_str,
             'email_address': to_str,
+            'Email Address': to_str,
             
             # Connection & Stats
             'connected_on': to_str,
+            'Connected On': to_str,
             'followerCount': to_int,
             'followers': to_int,
+            'Followers': to_int,
             'connectionsCount': to_int,
             
             # Flags
@@ -347,6 +373,7 @@ class GeminiEmbeddingsService:
             
             # Professional Details
             'title': to_str,
+            'Title': to_str,
             'experiences': to_str,
             'education': to_str,
             'skills': to_str,
@@ -356,20 +383,35 @@ class GeminiEmbeddingsService:
             
             # Company Details
             'companyName': to_str,
+            'CompanyName': to_str,
             'company': to_str,
+            'Company': to_str,
             'company_size': to_str,
+            'Company size': to_str,
             'company_website': to_str,
+            'CompanyWebsite': to_str,
             'company_phone': to_str,
+            'CompanyPhone/0': to_str,
             'company_industry': to_str,
+            'CompanyIndustry': to_str,
             'company_industry_topics': to_str,
+            'CompanyIndustryTopics': to_str,
             'company_description': to_str,
+            'CompanyDescription': to_str,
             'company_address': to_str,
+            'CompanyAddress/0': to_str,
             'company_city': to_str,
+            'CompanyCity/0': to_str,
             'company_state': to_str,
+            'CompanyState/0': to_str,
             'company_country': to_str,
+            'CompanyCountry/0': to_str,
             'company_revenue': to_str,
+            'CompanyRevenue': to_str,
             'company_latest_funding': to_str,
+            'CompanyLatestFunding/0': to_str,
             'company_linkedin': to_str,
+            'CompanyLinkedIn': to_str,
             'urn': to_str,
         }
 
@@ -386,6 +428,21 @@ class GeminiEmbeddingsService:
                         metadata[key] = converted_value
 
         # Post-processing to ensure consistency
+        # Normalize firstName variations
+        if 'firstName' not in metadata:
+            if 'FirstName' in metadata:
+                metadata['firstName'] = metadata['FirstName']
+            elif 'First Name' in metadata:
+                metadata['firstName'] = metadata['First Name']
+        
+        # Normalize lastName variations
+        if 'lastName' not in metadata:
+            if 'LastName' in metadata:
+                metadata['lastName'] = metadata['LastName']
+            elif 'Last Name' in metadata:
+                metadata['lastName'] = metadata['Last Name']
+        
+        # Build fullName if not present
         if 'fullName' not in metadata and ('firstName' in metadata or 'lastName' in metadata):
             first = metadata.get('firstName', '') or ''
             last = metadata.get('lastName', '') or ''
@@ -445,8 +502,14 @@ class GeminiEmbeddingsService:
                             if not profile_id:
                                 profile_id = f"profile_{total_rows + index}"
 
-                            # Skip if essential data is missing
-                            if not str(row.get('fullName', '')).strip():
+                            # Skip if essential data is missing (check for fullName, firstName, or lastName)
+                            # Try multiple variations of name columns
+                            full_name_check = str(row.get('fullName', '')).strip()
+                            first_name_check = str(row.get('firstName', row.get('FirstName', row.get('First Name', '')))).strip()
+                            last_name_check = str(row.get('lastName', row.get('LastName', row.get('Last Name', '')))).strip()
+                            
+                            if not (full_name_check or first_name_check or last_name_check):
+                                print(f"Skipping row {total_rows + index} - no name found")
                                 continue
                             
                             # Canonicalize the entire row's text for vectorization
